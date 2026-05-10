@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local env file. Always ignored — even though the canonical version holds
+# op:// references (not real secrets), users may paste plaintext into it as
+# the documented escape hatch, and that should never reach git.
+# A committed .env.example seeds new clones via `cp .env.example .env`.
+.env
+.env.local
+.env.*.local
+.env.backup*
+.env.bak
+
+# Past-iteration files (kept locally for reference, not for git history)
+archive/
+
+# Slack exports — contain real user IDs and message content, large, regenerable
+# via fetch-all-messages.py. Keep out of git.
+slack_*.json
+slack_*.csv
+message-fetches/
+
+# Throwaway smoke tests
+_*.py

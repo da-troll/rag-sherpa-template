@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Wrapper that resolves op:// references in .env via 1Password CLI,
+# then exec's whatever command you pass. Example:
+#   ./run python slack-to-pc.py
+set -euo pipefail
+exec op run --env-file=.env -- "$@"

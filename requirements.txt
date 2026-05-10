@@ -1,0 +1,19 @@
+# Core dependencies for RAG bot ingestion pipeline
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# OpenAI API for embeddings
+openai>=1.0.0
+
+# Pinecone vector database (renamed from pinecone-client)
+pinecone>=5.0.0
+
+# HTTP requests for Slack API
+requests>=2.31.0
+
+# Statistical analysis for chunking optimization
+numpy>=1.24.0
+
+# LlamaParse for image parsing
+llama-cloud-services>=0.1.0

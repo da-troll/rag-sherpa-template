@@ -11,8 +11,8 @@ from datetime import datetime
 from html.parser import HTMLParser
 
 # ===== CONFIG =====
-INPUT_JSON = "articles/scraped_help_articles.json"
-OUTPUT_JSON = "articles/cleaned_help_articles.json"
+INPUT_JSON = "data/articles/scraped_help_articles.json"
+OUTPUT_JSON = "data/articles/cleaned_help_articles.json"
 
 # Image filtering - exclude these patterns from content images
 EXCLUDE_IMAGE_PATTERNS = [
@@ -25,6 +25,71 @@ EXCLUDE_IMAGE_PATTERNS = [
     r"simployer.*logo",
     r"brand",
 ]
+
+# Whole-block chrome patterns. If a block's text matches any of these
+# (case-insensitive, anchored at start where appropriate), the entire block is
+# dropped rather than just having pieces stripped. NOISE_PATTERNS below only
+# works on concatenated text — it can't span multiple per-block snippets like
+# "Norwegian support" / "Telephone: ..." / "Mail: info@simployer.com" which
+# arrive as separate paragraph blocks.
+CHROME_BLOCK_PATTERNS = [
+    r'^was this article helpful',
+    r'^thank you for your feedback',
+    r"^that[''`]s great",
+    r"^sorry[!]? we couldn[''`]?t be helpful",
+    r'^print$',
+    r'^feedback sent',
+    r'^need more information difficult to understand',
+    r'^select at least one of the reasons',
+    r'^please give your comments',
+    r'^captcha verification',
+    r'^your e-mail address',
+    r'^let us know how can we improve',
+    r'^norwegian support$',
+    r'^swedish support$',
+    r'^telephone:\s*\+',
+    r'^mail:\s*info@simployer\.com',
+    r'^opening hours',
+    r'^this knowledgebase is licensed',
+    r'^accept all(\s+cookies)?$',
+    r'^view cookies$',
+    r'^cookie preferences manager$',
+    r'^strictly necessary cookies',
+    r'^we use cookies',
+    r'^you can learn more about',
+    r'^because we respect your right',
+    r'^these cookies are necessary',
+    r'^articles in this folder',
+    r'^you may like to read',
+    r'^your privacy(\s+strictly necessary cookies)?$',
+    r'^home\s+knowledge base',
+    r'^skip to main content',
+    r'^all articles\s+recent searches',
+    r'^no recent searches',
+    r'^popular articles',
+    r'^articles view all',
+    r'^topics view all',
+    r'^tickets view all',
+    r'^login\s+sign up',
+    r'^modified on\s',
+    # JS artifacts
+    r"^document\.queryselectorall",
+    r"^const attachment_error_image",
+    r"^\[\s*[''`]click[''`]",
+    r"^0 of 0\b",
+    r"^footer\s+a\s+\{",
+    r"^[\w\.]+\.simployer\.com\s+\d",  # cookie table rows like "_fw_crm_v simployer.freshdesk.com 1 year"
+]
+_CHROME_RE = re.compile('|'.join(f'({p})' for p in CHROME_BLOCK_PATTERNS),
+                         flags=re.IGNORECASE)
+
+def is_chrome_block(text: str) -> bool:
+    """True if a block's text is page chrome (cookie banner, support footer,
+    JS artifact, knowledge-base nav) and should be dropped entirely."""
+    t = text.strip()
+    if not t:
+        return True
+    return bool(_CHROME_RE.match(t))
 
 # Text noise patterns to remove (appears in all articles)
 NOISE_PATTERNS = [
@@ -92,9 +157,28 @@ def clean_text(text: str) -> str:
     return cleaned.strip()
 
 def is_content_image(img: Dict[str, Any]) -> bool:
-    """Determine if image is actual content (not logo/UI element)."""
+    """Determine if image is actual content (not logo/UI element).
+
+    Filters chrome icons, SVGs (always icons by convention), and Freshdesk
+    tracking endpoints (URLs ending in /hit, /track, /pixel) so they never
+    reach LlamaParse — saves cost and avoids NO_CONTENT_HERE responses on
+    non-image URLs.
+    """
     src = img.get('src', '').lower()
     alt = img.get('alt', '').lower()
+
+    # SVGs: always icons, never content screenshots in this corpus.
+    if src.endswith('.svg') or src.endswith('.svgz'):
+        return False
+
+    # Tracking / non-image endpoints (freshdesk hit-trackers etc.)
+    parsed_path = src.split('?', 1)[0].rstrip('/')
+    if parsed_path.endswith(('/hit', '/track', '/pixel', '/beacon', '/impression')):
+        return False
+    # No file extension and no recognizable image suffix anywhere → likely tracking
+    if '.' not in parsed_path.rsplit('/', 1)[-1] and any(
+            ep in parsed_path for ep in ('/hit', '/track', '/pixel')):
+        return False
 
     for pattern in EXCLUDE_IMAGE_PATTERNS:
         if re.search(pattern, src, re.IGNORECASE) or re.search(pattern, alt, re.IGNORECASE):
@@ -322,7 +406,29 @@ def clean_article(url: str, article: Dict[str, Any]) -> Dict[str, Any]:
     # Clean the text
     clean_text_content = clean_text(structured_text)
 
-    # Extract images with context
+    # Strip chrome from blocks before they reach the markdown step. Two-pass:
+    # 1) drop whole blocks whose text matches a CHROME_BLOCK_PATTERN (cookie
+    #    banners, support-contact footers, JS artifacts, KB navigation)
+    # 2) apply NOISE_PATTERNS substring-stripping to surviving paragraphs/headers
+    cleaned_blocks = []
+    for block in content_blocks:
+        if block.get('type') in ('paragraph', 'header'):
+            text = block.get('text', '')
+            if is_chrome_block(text):
+                continue
+            cleaned_text = clean_text(text)
+            if not cleaned_text.strip():
+                continue
+            if is_chrome_block(cleaned_text):  # may match after NOISE_PATTERNS strips bits
+                continue
+            block = {**block, 'text': cleaned_text}
+        cleaned_blocks.append(block)
+    # Re-number positions so they stay contiguous after dropping noise blocks
+    for i, b in enumerate(cleaned_blocks):
+        b['position'] = i
+    content_blocks = cleaned_blocks
+
+    # Extract images with context (uses the now-cleaned blocks)
     images_with_context = extract_images_with_context(content_blocks)
 
     # Extract headers for navigation

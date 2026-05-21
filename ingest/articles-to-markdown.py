@@ -2,10 +2,18 @@
 """
 Convert cleaned help articles to markdown format with LlamaParse image parsing.
 Uses LlamaParse to convert screenshot images into structured markdown representations.
+
+Test-mode flags (recommended before a full run, since LlamaParse costs per page):
+    --only <key>     Process only one article by its key (see cleaned JSON keys).
+    --limit N        Process only the first N articles (debugging).
+    --output PATH    Override output path. When --only or --limit is set WITHOUT
+                     this flag, output defaults to data/articles/markdown_help_articles.test.json
+                     so the production output is never accidentally overwritten.
 """
 import os
 import sys
 import json
+import argparse
 import requests
 import tempfile
 from typing import Dict, Any, List
@@ -14,11 +22,12 @@ from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 
 # Load environment
-load_dotenv(find_dotenv(usecwd=True), override=True)
+load_dotenv(find_dotenv(usecwd=True), override=False)  # parent env (op run) wins over .env literals
 
 # ===== CONFIG =====
-INPUT_JSON = "articles/cleaned_help_articles.json"
-OUTPUT_JSON = "articles/markdown_help_articles.json"
+INPUT_JSON = "data/articles/cleaned_help_articles.json"
+OUTPUT_JSON_DEFAULT = "data/articles/markdown_help_articles.json"
+OUTPUT_JSON_TEST = "data/articles/markdown_help_articles.test.json"
 LLAMA_CLOUD_API_KEY = os.getenv("LLAMA_CLOUD_API_KEY")
 
 if not LLAMA_CLOUD_API_KEY:
@@ -245,6 +254,12 @@ def convert_article_to_markdown(article_key: str, article: Dict[str, Any], temp_
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", default=None, help="Process only this article key (e.g. 'getting_started')")
+    ap.add_argument("--limit", type=int, default=None, help="Process only the first N articles")
+    ap.add_argument("--output", default=None, help="Override output JSON path")
+    args = ap.parse_args()
+
     print(f"Loading cleaned articles from {INPUT_JSON}...")
 
     try:
@@ -253,7 +268,27 @@ def main():
     except FileNotFoundError:
         sys.exit(f"ERROR: {INPUT_JSON} not found. Run clean-articles-json.py first.")
 
+    # Apply test-mode filters
+    is_test_run = bool(args.only or args.limit)
+    if args.only:
+        if args.only not in cleaned_articles:
+            available = ", ".join(list(cleaned_articles.keys())[:5]) + ", ..."
+            sys.exit(f"ERROR: --only '{args.only}' not found. Available keys (first 5): {available}")
+        cleaned_articles = {args.only: cleaned_articles[args.only]}
+    elif args.limit:
+        cleaned_articles = dict(list(cleaned_articles.items())[:args.limit])
+
+    # Output path: explicit override > test default > production default
+    if args.output:
+        output_path = args.output
+    elif is_test_run:
+        output_path = OUTPUT_JSON_TEST
+        print(f"[test mode] Writing to {output_path} (production output untouched)")
+    else:
+        output_path = OUTPUT_JSON_DEFAULT
+
     print(f"Found {len(cleaned_articles)} articles to convert")
+    print(f"Output: {output_path}")
     print("=" * 80)
 
     markdown_articles = {}
@@ -278,9 +313,9 @@ def main():
                 continue
 
     print("\n" + "=" * 80)
-    print(f"Writing markdown articles to {OUTPUT_JSON}...")
+    print(f"Writing markdown articles to {output_path}...")
 
-    with open(OUTPUT_JSON, 'w', encoding='utf-8') as f:
+    with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(markdown_articles, f, ensure_ascii=False, indent=2)
 
     print(f"✓ Successfully converted {len(markdown_articles)} articles to markdown")

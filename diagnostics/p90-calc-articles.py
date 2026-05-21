@@ -11,7 +11,7 @@ import json, re, os, sys
 from pathlib import Path
 
 INPUT_JSON = "markdown_help_articles.json" if Path("markdown_help_articles.json").exists() \
-    else "articles/markdown_help_articles.json"
+    else "data/articles/markdown_help_articles.json"
 
 HEADER_RE = re.compile(r'^(#{2,3} .+)$', re.MULTILINE)
 

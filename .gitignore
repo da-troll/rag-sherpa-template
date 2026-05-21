@@ -34,10 +34,28 @@ Thumbs.db
 archive/
 
 # Slack exports — contain real user IDs and message content, large, regenerable
-# via fetch-all-messages.py. Keep out of git.
+# via ingest/fetch-all-messages.py. Pattern matches both old (repo-root) and
+# new (data/slack/) locations.
 slack_*.json
 slack_*.csv
+data/slack/
 message-fetches/
 
-# Throwaway smoke tests
+# Throwaway smoke tests / one-shot scripts (e.g. _genericize.py, _wipe_namespace.py)
 _*.py
+_*.txt
+
+# Internal working docs (planning notes, scratchpads, audit + roadmap).
+# These describe how we got here / where we're going — not part of the live
+# pipeline spec. Live spec lives in README.md, CLAUDE.md, and code.
+RAG_IMPROVEMENTS_PLAN.md
+GENERICIZATION_PLAN.md
+
+# Eval results (regenerable; per-run retrieval scores aren't useful in git history)
+eval/results/
+
+# Scraper per-URL HTML cache (regenerable; large)
+data/articles/.cache/
+
+# LlamaParse test-run output (regenerable, throwaway)
+data/articles/markdown_help_articles.test.json

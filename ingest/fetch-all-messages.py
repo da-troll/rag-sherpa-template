@@ -2,7 +2,7 @@
 import os, time, json, csv, datetime, sys, requests
 from dotenv import load_dotenv, find_dotenv
 
-load_dotenv(find_dotenv(usecwd=True), override=True)
+load_dotenv(find_dotenv(usecwd=True), override=False)  # parent env (op run) wins over .env literals
 
 # ========= CONFIG =========
 # SLACK_TOKEN is resolved by `op run` from 1Password; SLACK_CHANNEL_ID lives in .env.
@@ -161,8 +161,8 @@ def write_csv(csv_path, messages):
 def main():
     token = SLACK_TOKEN
     chan  = CHANNEL_ID
-    json_out = f"slack_{chan}.json"
-    csv_out  = f"slack_{chan}.csv"
+    json_out = f"data/slack/slack_{chan}.json"
+    csv_out  = f"data/slack/slack_{chan}.csv"
 
     print(f"Fetching channel {chan} ...")
     msgs = collect_channel_with_threads(token, chan)

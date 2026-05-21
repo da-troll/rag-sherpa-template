@@ -7,9 +7,9 @@ import os, sys, json
 import numpy as np
 from dotenv import load_dotenv, find_dotenv
 
-load_dotenv(find_dotenv(usecwd=True), override=True)
+load_dotenv(find_dotenv(usecwd=True), override=False)  # parent env (op run) wins over .env literals
 
-SLACK_JSON_PATH = os.getenv("SLACK_JSON_PATH", "slack_C08MGP5N8DA.json")
+SLACK_JSON_PATH = os.getenv("SLACK_JSON_PATH", "data/slack/slack_C08MGP5N8DA.json")
 if not os.path.exists(SLACK_JSON_PATH):
     sys.exit(f"SLACK_JSON_PATH not found: {SLACK_JSON_PATH} (set in .env)")
 

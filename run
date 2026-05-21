@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Wrapper that resolves op:// references in .env via 1Password CLI,
-# then exec's whatever command you pass. Example:
+# activates the local venv if it exists, then exec's whatever command you pass.
+# Example:
 #   ./run python slack-to-pc.py
 set -euo pipefail
-exec op run --env-file=.env -- "$@"
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -d "$REPO_DIR/venv/bin" ]]; then
+    PATH="$REPO_DIR/venv/bin:$PATH"
+fi
+
+exec op run --env-file="$REPO_DIR/.env" -- "$@"

@@ -14,7 +14,7 @@ The bot itself runs in n8n: retrieve top-K from Pinecone, re-rank with a small J
 ## Project structure
 
 ```
-slack-rag-bot-template/
+rag-sherpa-template/
 ├── README.md                  # This file — human-facing template guide
 ├── CLAUDE.md                  # LLM-agent-oriented version of the same spec
 ├── LICENSE                    # MIT

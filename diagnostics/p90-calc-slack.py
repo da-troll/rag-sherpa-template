@@ -9,11 +9,11 @@ from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv(usecwd=True), override=False)  # parent env (op run) wins over .env literals
 
-SLACK_JSON_PATH = os.getenv("SLACK_JSON_PATH", "data/slack/slack_C08MGP5N8DA.json")
+SLACK_JSON_PATH = os.getenv("SLACK_JSON_PATH", "data/slack/slack_C0000000000.json")
 if not os.path.exists(SLACK_JSON_PATH):
     sys.exit(f"SLACK_JSON_PATH not found: {SLACK_JSON_PATH} (set in .env)")
 
-def has_recruitment_reaction(msg):
+def has_primary_tag(msg):
     for r in (msg.get("reactions") or []):
         if (r.get("name") or "").lower() == "recruitment":
             return True
@@ -36,8 +36,8 @@ def length_stats():
     for k in by_t:
         by_t[k].sort(key=lambda x: float(x["ts"]))
 
-    # select parent messages with :recruitment: reaction
-    parents = [m for m in msgs if is_parent(m) and has_recruitment_reaction(m)]
+    # select parent messages with :verified: reaction
+    parents = [m for m in msgs if is_parent(m) and has_primary_tag(m)]
 
     pairs = []
     for p in parents:

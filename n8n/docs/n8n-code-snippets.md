@@ -1,6 +1,6 @@
 # n8n Code Snippets for RAG Ranking
 
-Ready-to-use code templates for implementing metadata-based boosting in n8n Code nodes. All snippets are optimized for the recruitment RAG bot with `has_trusted` and `has_recruitment_reaction` metadata.
+Ready-to-use code templates for implementing metadata-based boosting in n8n Code nodes. All snippets are optimized for the recruitment RAG bot with `has_trusted` and `has_primary_tag` metadata.
 
 ---
 
@@ -36,7 +36,7 @@ const results = items
     const score = item.json.score || 0;
 
     const hasTrusted = meta.has_trusted === true;
-    const hasReaction = meta.has_recruitment_reaction === true;
+    const hasReaction = meta.has_primary_tag === true;
 
     let boost = 1.0;
     if (hasTrusted && hasReaction) boost = COMBINED_BOOST;
@@ -79,7 +79,7 @@ const items = $input.all();
 
 function determineBoost(metadata) {
   const hasTrusted = metadata.has_trusted === true;
-  const hasReaction = metadata.has_recruitment_reaction === true;
+  const hasReaction = metadata.has_primary_tag === true;
 
   if (hasTrusted && hasReaction) return { boost: BOOSTS.both, reason: 'trusted+reaction' };
   if (hasTrusted) return { boost: BOOSTS.trusted_only, reason: 'trusted' };
@@ -146,7 +146,7 @@ const boosted = items.map(item => {
   const score = item.json.score || 0;
 
   const hasTrusted = meta.has_trusted === true;
-  const hasReaction = meta.has_recruitment_reaction === true;
+  const hasReaction = meta.has_primary_tag === true;
 
   let boost = 1.0;
   if (hasTrusted && hasReaction) boost = COMBINED_BOOST;
@@ -277,10 +277,10 @@ function detectQueryType(item) {
   if (item.json.query_type) return item.json.query_type;
 
   // Heuristic: if metadata shows filtering, assume filtered query
-  if (meta.has_trusted === true && meta.has_recruitment_reaction !== true) {
+  if (meta.has_trusted === true && meta.has_primary_tag !== true) {
     return 'trusted';
   }
-  if (meta.has_recruitment_reaction === true && meta.has_trusted !== true) {
+  if (meta.has_primary_tag === true && meta.has_trusted !== true) {
     return 'reaction';
   }
 
@@ -377,12 +377,12 @@ https://{{$env.PINECONE_INDEX}}-{{$env.PINECONE_PROJECT}}.svc.{{$env.PINECONE_EN
   "filter": {
     "$or": [
       {"has_trusted": {"$eq": true}},
-      {"has_recruitment_reaction": {"$eq": true}}
+      {"has_primary_tag": {"$eq": true}}
     ]
   },
   "topK": 20,
   "includeMetadata": true,
-  "namespace": "recruitment-rag"
+  "namespace": "your-namespace"
 }
 ```
 
@@ -436,7 +436,7 @@ if (ENABLE_TRUSTED_FILTER) {
 }
 
 if (ENABLE_REACTION_FILTER) {
-  filters.push({"has_recruitment_reaction": {"$eq": true}});
+  filters.push({"has_primary_tag": {"$eq": true}});
 }
 
 let finalFilter = {};
@@ -458,7 +458,7 @@ return [{
     filter: finalFilter,
     topK: 20,
     includeMetadata: true,
-    namespace: "recruitment-rag"
+    namespace: "your-namespace"
   }
 }];
 ```
@@ -528,7 +528,7 @@ items.forEach(item => {
   }
 
   const hasTrusted = meta.has_trusted === true;
-  const hasReaction = meta.has_recruitment_reaction === true;
+  const hasReaction = meta.has_primary_tag === true;
 
   if (hasTrusted) coverage.has_trusted_count++;
   if (hasReaction) coverage.has_reaction_count++;
@@ -634,7 +634,7 @@ function getMetadata(item, field, defaultValue = null) {
 const items = $input.all();
 items.forEach(item => {
   const trusted = getMetadata(item, 'has_trusted', false);
-  const reaction = getMetadata(item, 'has_recruitment_reaction', false);
+  const reaction = getMetadata(item, 'has_primary_tag', false);
   console.log(`Trusted: ${trusted}, Reaction: ${reaction}`);
 });
 

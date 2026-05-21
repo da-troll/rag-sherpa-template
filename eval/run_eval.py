@@ -12,7 +12,7 @@ retrieval — we don't want boost variations confounding the signal.
 
 Usage:
     ./run python eval/run_eval.py                       # default namespace from .env
-    ./run python eval/run_eval.py --namespace recruitment-rag-2   # explicit baseline
+    ./run python eval/run_eval.py --namespace your-namespace   # explicit baseline
     ./run python eval/run_eval.py --top-k 10 --output eval/results/baseline.json
 """
 import os, sys, json, argparse, datetime

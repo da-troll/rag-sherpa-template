@@ -22,11 +22,11 @@ from styling import (
 
 # ======== CONFIG ========
 # Load all config from .env
-SLACK_JSON_PATH = os.getenv("SLACK_JSON_PATH", "data/slack/slack_C08MGP5N8DA.json")
-WORKSPACE_HOST  = os.getenv("SLACK_WORKSPACE_HOST", "https://simployer.slack.com")
-PINECONE_INDEX  = os.getenv("PINECONE_INDEX", "n8n-recruitment-rag-bot-1536")
+SLACK_JSON_PATH = os.getenv("SLACK_JSON_PATH", "data/slack/slack_C0000000000.json")
+WORKSPACE_HOST  = os.getenv("SLACK_WORKSPACE_HOST", "https://your-workspace.slack.com")
+PINECONE_INDEX  = os.getenv("PINECONE_INDEX", "n8n-your-namespace-bot-1536")
 PINECONE_HOST   = os.getenv("PINECONE_HOST")  # optional; bypass describe_index for scoped keys
-PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE", "recruitment-rag-2")
+PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE", "your-namespace")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "64"))
 
@@ -103,21 +103,21 @@ def is_parent(msg: Dict[str, Any]) -> bool:
     ts = msg.get("ts")
     return (msg.get("thread_ts") or ts) == ts
 
-def parent_has_recruitment(msg: Dict[str, Any]) -> bool:
+def parent_has_primary_tag(msg: Dict[str, Any]) -> bool:
     for r in (msg.get("reactions") or []):
         if (r.get("name") or "").lower() == "recruitment":
             return True
     return False
 
-def has_recruitment_reaction(msg: Dict[str, Any]) -> bool:
-    """Check if a message has the :recruitment: reaction"""
+def has_primary_tag(msg: Dict[str, Any]) -> bool:
+    """Check if a message has the :verified: reaction"""
     for r in (msg.get("reactions") or []):
         if (r.get("name") or "").lower() == "recruitment":
             return True
     return False
 
 # System-event subtypes whose messages are not real content. They generate
-# garbage embeddings (e.g. "<@U082LELDMBN> has joined the channel") that
+# garbage embeddings (e.g. "<@U0000000001> has joined the channel") that
 # pollute retrieval, so we drop them before any vector is built.
 SKIP_SUBTYPES = {
     "channel_join", "channel_leave", "channel_name",
@@ -126,12 +126,12 @@ SKIP_SUBTYPES = {
     "thread_broadcast",  # duplicates a reply at top level — already covered by the source thread
 }
 
-# Quality signal: the boolean `has_recruitment_reaction` is the ONLY quality
+# Quality signal: the boolean `has_primary_tag` is the ONLY quality
 # signal we track at ingest time.
 #
-# Why presence-only (not count): the `:recruitment:` reaction is applied by
+# Why presence-only (not count): the `:verified:` reaction is applied by
 # the SME owner of this RAG corpus to mark threads as verified content.
-# Additional `:recruitment:` reactions are typically other team members
+# Additional `:verified:` reactions are typically other team members
 # joining the SME's lead — they don't ADD verification, they just echo it.
 # So multiplicity isn't quality signal, presence is.
 #
@@ -140,7 +140,7 @@ SKIP_SUBTYPES = {
 # announcements, casual agreements, and sympathy acknowledgments. Counting
 # them would corrupt the clean curation signal.
 #
-# The boolean `has_recruitment_reaction` is already computed below from the
+# The boolean `has_primary_tag` is already computed below from the
 # parent + replies. No additional metadata field is needed.
 
 def _reaction_base_name(name: str) -> str:
@@ -148,7 +148,7 @@ def _reaction_base_name(name: str) -> str:
     return (name or "").lower().split("::", 1)[0]
 
 # Experimental override: set SLACK_INCLUDE_BOTS=1 to DISABLE the bot-message
-# filter — bot replies (notably Ragnar's own historical answers) will be
+# filter — bot replies (notably RAG Bot's own historical answers) will be
 # re-ingested as if they were human content. Only intended for the
 # self-ingestion drift A/B experiment documented in
 # `experiments/bot-self-ingestion-drift.md`. Default is "0" (filter ON).
@@ -159,7 +159,7 @@ def is_bot_message(msg: Dict[str, Any]) -> bool:
 
     Bot messages are filtered out at ingest time so they can't be re-embedded
     as authoritative answers — they were generated FROM the index, and feeding
-    them back risks closed-loop drift. Currently filters 347+ of Ragnar's own
+    them back risks closed-loop drift. Currently filters 347+ of RAG Bot's own
     replies in the recruitment channel.
 
     When the experimental SLACK_INCLUDE_BOTS=1 env var is set, this function
@@ -314,7 +314,7 @@ def _parse_args():
     ap.add_argument("--namespace", default=None,
                     help="Override PINECONE_NAMESPACE (use to target a non-production namespace).")
     ap.add_argument("--include-bots", action="store_true",
-                    help="Disable the bot-message filter (re-ingests Ragnar's own replies). "
+                    help="Disable the bot-message filter (re-ingests RAG Bot's own replies). "
                          "Equivalent to SLACK_INCLUDE_BOTS=1.")
     return ap.parse_args()
 
@@ -342,10 +342,10 @@ def main():
     pairs = collect_parent_threads(messages)
     parents_total = len(pairs)
     kept_replies = sum(len(r) for _, r in pairs)
-    parents_with_recruitment = sum(1 for p, _ in pairs if parent_has_recruitment(p))
+    parents_with_recruitment = sum(1 for p, _ in pairs if parent_has_primary_tag(p))
     threads_with_recruitment = sum(
         1 for p, r in pairs
-        if has_recruitment_reaction(p) or any(has_recruitment_reaction(x) for x in r)
+        if has_primary_tag(p) or any(has_primary_tag(x) for x in r)
     )
 
     # ---- banner ----
@@ -373,7 +373,7 @@ def main():
     print(f"  {DIM}replies{RESET}     {BOLD}{kept_replies}{RESET} human "
           f"{DIM}(dropped {bot_replies_total} bot-authored from {raw_replies} total){RESET}")
     print(f"  {DIM}signals{RESET}     "
-          f":recruitment: on parent {BOLD}{parents_with_recruitment}{RESET}  ·  "
+          f":verified: on parent {BOLD}{parents_with_recruitment}{RESET}  ·  "
           f"anywhere in thread {BOLD}{threads_with_recruitment}{RESET}")
     print()
 
@@ -412,13 +412,13 @@ def main():
         thread_has_trusted = any(x["author_trusted"] for x in per_msg)
         thread_has_answer  = any(x["answer_like"] for x in per_msg)
 
-        # Check if parent or any reply has :recruitment: reaction
-        thread_has_recruitment_reaction = has_recruitment_reaction(p) or any(
-            has_recruitment_reaction(r) for r in replies
+        # Check if parent or any reply has :verified: reaction
+        thread_has_primary_tag = has_primary_tag(p) or any(
+            has_primary_tag(r) for r in replies
         )
 
-        # Quality signal: `has_recruitment_reaction` (boolean) is computed
-        # below in `base_meta` from `parent_has_recruitment(p) or any(...)`.
+        # Quality signal: `has_primary_tag` (boolean) is computed
+        # below in `base_meta` from `parent_has_primary_tag(p) or any(...)`.
         # It's the ONLY curation signal we surface — presence not count.
 
         base_meta = {
@@ -433,7 +433,7 @@ def main():
             "chunk_strategy": f"chars{CHUNK_CHARS}_overlap{CHUNK_OVERLAP}",
             "has_trusted": thread_has_trusted,
             "has_answer_like": thread_has_answer,
-            "has_recruitment_reaction": thread_has_recruitment_reaction,
+            "has_primary_tag": thread_has_primary_tag,
             "trusted_repliers": doc.get("trusted_repliers", []),
             "trusted_count": doc.get("trusted_count", 0),
         }
@@ -530,7 +530,7 @@ def main():
 
         # Close the per-thread inline line with a fixed-column summary.
         # Chunk count is right-aligned to 2 digits so "1 chunks" / "12 chunks"
-        # both produce the same width. The `:recruitment:` chip is intentionally
+        # both produce the same width. The `:verified:` chip is intentionally
         # not displayed — the boolean lives in metadata for n8n boost code, but
         # adding it inline made the terminal layout noisy and inconsistent.
         _tc = base_meta['trusted_count']

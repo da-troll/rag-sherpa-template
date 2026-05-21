@@ -14,9 +14,9 @@ Measures retrieval quality of the recruitment RAG pipeline against a labeled que
 # Run against the current namespace (whatever PINECONE_NAMESPACE points at)
 ./run python eval/run_eval.py
 
-# Compare baseline (recruitment-rag-2) vs new namespace (recruitment-rag-3)
-./run python eval/run_eval.py --namespace recruitment-rag-2 --output eval/results/baseline.json
-./run python eval/run_eval.py --namespace recruitment-rag-3 --output eval/results/contextual.json
+# Compare baseline (your-namespace) vs new namespace (your-namespace)
+./run python eval/run_eval.py --namespace your-namespace --output eval/results/baseline.json
+./run python eval/run_eval.py --namespace your-namespace --output eval/results/contextual.json
 ```
 
 ## Question format
@@ -25,7 +25,7 @@ Measures retrieval quality of the recruitment RAG pipeline against a labeled que
 {
   "id": "q001",
   "question": "How do I bulk import candidates?",
-  "match": {"doc_id": "hc::simployer_one___recruitment___importing_candidates::5771b0a93c3d"},
+  "match": {"doc_id": "hc::<your-company>_one___recruitment___importing_candidates::5771b0a93c3d"},
   "notes": "import flow"
 }
 ```
@@ -36,13 +36,13 @@ Every key in `match` must be present in the matched vector's metadata. Strings u
 
 It measures **retrieval quality only** — embedding similarity → Pinecone top-K → did the labeled vector appear?
 
-It does NOT apply your n8n metadata boost (`has_trusted`, `has_recruitment_reaction`, recency decay). That's intentional — when comparing changes that affect embeddings (contextual retrieval, new model), you want the boost out of the picture so the signal is clean. Boost effects can be measured separately later by extending the harness.
+It does NOT apply your n8n metadata boost (`has_trusted`, `has_primary_tag`, recency decay). That's intentional — when comparing changes that affect embeddings (contextual retrieval, new model), you want the boost out of the picture so the signal is clean. Boost effects can be measured separately later by extending the harness.
 
 ## Expanding the question set
 
 The committed starter set (~20 questions) covers the 16 help articles, with a mix of literal phrasings and lexical-mismatch questions. To get to a robust 30–50 questions, add:
 
-- Real questions from your `:recruitment:`-tagged Slack threads (use the parent message text). For each, find which thread or article actually answered it and label `match: {"thread_ts": "..."}` or `match: {"doc_id": "..."}`.
+- Real questions from your `:verified:`-tagged Slack threads (use the parent message text). For each, find which thread or article actually answered it and label `match: {"thread_ts": "..."}` or `match: {"doc_id": "..."}`.
 - Edge cases: ambiguous questions, multi-doc questions, questions that should fall back gracefully.
 - Negative tests: questions outside the corpus, where you expect *no* good match (these can use `"match_negative": true` once that's added — TBD).
 

@@ -1,6 +1,6 @@
 # Recruitment RAG Bot
 
-A small ingestion pipeline that turns two messy sources of internal knowledge — a Slack support channel and a Freshdesk help center — into clean, searchable vectors in Pinecone. An n8n workflow then queries those vectors to power **Ragnar**, our recruitment Q&A bot.
+A small ingestion pipeline that turns two messy sources of internal knowledge — a Slack support channel and a your help center — into clean, searchable vectors in Pinecone. An n8n workflow then queries those vectors to power **RAG Bot**, our recruitment Q&A bot.
 
 The pipeline is **manual and step-by-step**: each stage is a separate Python script that reads a file, does one thing, and writes the next file. You run them in order. No orchestration, no scheduler, no surprises.
 
@@ -80,7 +80,7 @@ data/slack/slack_<CHANNEL_ID>.json    data/articles/cleaned_help_articles.json
                                   ▼
                        ┌──────────────────────┐
                        │   n8n workflow       │
-                       │   (Ragnar bot)       │
+                       │   (RAG Bot bot)       │
                        │  retrieve → boost    │
                        │  → top 5 → LLM       │
                        └──────────────────────┘
@@ -111,10 +111,10 @@ This means you have two ways to fill in any secret:
 
 | Variable | 1Password reference (in `.env`) |
 | --- | --- |
-| `OPENAI_API_KEY` | `op://Employee/uw6soelyqjqerwkogprxr7t4ia/api key` |
-| `SLACK_TOKEN` | `op://Employee/fe7qwdxozznsegta7vdtkeyv7m/credential` |
-| `PINECONE_API_KEY` | `op://Employee/575iu6gscslfu6dbmtgzvpi6hy/credential` |
-| `LLAMA_CLOUD_API_KEY` | `op://Employee/lnhrdmv73rtdgb6ew53wqhmewu/credential` |
+| `OPENAI_API_KEY` | `op://<YOUR_VAULT>/OpenAI API Key/api key` |
+| `SLACK_TOKEN` | `op://<YOUR_VAULT>/Slack Bot Token/credential` |
+| `PINECONE_API_KEY` | `op://<YOUR_VAULT>/Pinecone API Key/credential` |
+| `LLAMA_CLOUD_API_KEY` | `op://<YOUR_VAULT>/LlamaCloud API Key/credential` |
 
 **Plain values you fill in yourself in `.env` (not secrets, just config):**
 
@@ -169,7 +169,7 @@ Reads `SLACK_TOKEN` and `SLACK_CHANNEL_ID` from `.env`. Walks the channel, follo
 ./run python diagnostics/p90-calc-slack.py
 ```
 
-Looks only at threads tagged with the `:recruitment:` reaction, computes their character-length distribution, and prints a suggested `SLACK_CHUNK_CHARS` / `SLACK_CHUNK_OVERLAP`. Skip this unless you've changed the corpus shape.
+Looks only at threads tagged with the `:verified:` reaction, computes their character-length distribution, and prints a suggested `SLACK_CHUNK_CHARS` / `SLACK_CHUNK_OVERLAP`. Skip this unless you've changed the corpus shape.
 
 ### Step 3 — embed and upload to Pinecone
 
@@ -186,14 +186,14 @@ For each thread, this script writes **two kinds of vectors**:
 
 Before any vector is built, the script **filters out:**
 - Non-content parent messages (channel_join, channel_name changes, etc.) — system events whose embeddings would pollute retrieval with garbage like `"<@U...> has joined the channel"`.
-- **Bot/app-authored replies** — Ragnar's own answers were originally generated *from* the index. We empirically measured a **20-point R@1 drop and 0.113 MRR drop** when this filter was disabled (see `experiments/bot-self-ingestion-drift.md`). The filter checks `bot_id`, `app_id`, and `subtype == "bot_message"`.
+- **Bot/app-authored replies** — RAG Bot's own answers were originally generated *from* the index. We empirically measured a **20-point R@1 drop and 0.113 MRR drop** when this filter was disabled (see `experiments/bot-self-ingestion-drift.md`). The filter checks `bot_id`, `app_id`, and `subtype == "bot_message"`.
 
 The experimental override `SLACK_INCLUDE_BOTS=1` (or `--include-bots` CLI flag) disables the filter — used only by the bot-drift A/B experiment and not for production.
 
 Every vector carries metadata the n8n bot uses for ranking:
 - `has_trusted` / `trusted_count` / `trusted_repliers` — SME participation signal (curation-independent)
-- `has_recruitment_reaction` — explicit `:recruitment:` tag (depends on someone tagging threads)
-- `has_recruitment_reaction` — true when the parent or any reply carries the `:recruitment:` reaction. This is the **only** quality signal in metadata. Presence-only (not count): additional `:recruitment:` reactions are typically other team members echoing the SME's tag — they don't add verification. Other reactions (`:+1:`, `:raised_hands:`, etc.) are not used as signal at all — they fire too ambiguously on announcements and sympathy to be reliable for retrieval. The n8n boost code is where the weight gets applied (multiply by a constant when this flag is true).
+- `has_primary_tag` — explicit `:verified:` tag (depends on someone tagging threads)
+- `has_primary_tag` — true when the parent or any reply carries the `:verified:` reaction. This is the **only** quality signal in metadata. Presence-only (not count): additional `:verified:` reactions are typically other team members echoing the SME's tag — they don't add verification. Other reactions (`:+1:`, `:raised_hands:`, etc.) are not used as signal at all — they fire too ambiguously on announcements and sympathy to be reliable for retrieval. The n8n boost code is where the weight gets applied (multiply by a constant when this flag is true).
 - `ts_last` / `ts_first` — for recency decay in boost
 - `permalink` — for citations
 
@@ -211,7 +211,7 @@ The articles arrive as scraped HTML/JSON, full of cookie banners and screenshots
 
 Fetches the listing-page URLs in `HELP_CENTER_LISTING_URLS`, discovers all linked articles, and writes the full HTML of each into `data/articles/scraped_help_articles.json`. Polite (1.5s default delay between requests, retry-with-backoff on 5xx/429). Resumable — per-URL HTML cache lives in `data/articles/.cache/` (gitignored), so re-runs are essentially free unless you pass `--force`. Image `src` and link `href` attributes are absolutized so downstream steps don't choke on relative paths.
 
-To target a different help center, override `SCRAPE_ARTICLE_URL_PATTERN` (defaults to Freshdesk's `/support/solutions/articles/...` shape). Use `--limit N` for debugging.
+To target a different help center, override `SCRAPE_ARTICLE_URL_PATTERN` (defaults to your help center provider's `/support/solutions/articles/...` shape). Use `--limit N` for debugging.
 
 ### Step 1 — clean the scraped JSON
 
@@ -274,17 +274,17 @@ Past iterations of this pipeline. Nothing here is run by the current scripts, bu
 
 ---
 
-## n8n / Ragnar bot
+## n8n / RAG Bot bot
 
 The bot itself lives in n8n; the exported workflow is `n8n/n8n-workflow.json`. It's **not** a Vector Store Tool agent — it's an explicit retrieval pipeline so a small JavaScript Code node can boost results between Pinecone and the LLM:
 
 ```
 [Slack Webhook] → [Bot vs. User] → [Fetch Slack Thread] → [Parse Context]
   → [Classifier: question?] → [Pinecone top 20] → [Metadata Boost (Code)]
-  → [top 10 chunks] → [Ragnar agent] → [Send thread reply]
+  → [top 10 chunks] → [RAG Bot agent] → [Send thread reply]
 ```
 
-The boost code keys on `has_recruitment_reaction` (×1.40), `has_trusted` (×1.30), plus smaller multipliers for `has_images`, `synth`, and multi-SME threads. The node returns a **single item** with a `chunks` array (not 10 items, which would cause the agent to run 10× and break pairing); downstream references use `.first()` instead of `.item`.
+The boost code keys on `has_primary_tag` (×1.40), `has_trusted` (×1.30), plus smaller multipliers for `has_images`, `synth`, and multi-SME threads. The node returns a **single item** with a `chunks` array (not 10 items, which would cause the agent to run 10× and break pairing); downstream references use `.first()` instead of `.item`.
 
 Implementation notes and copy-paste snippets:
 
@@ -336,7 +336,7 @@ recruitment/
 │
 ├── n8n/                       # Bot workflow + system prompt + integration docs
 │   ├── n8n-workflow.json                       # Exported workflow (import into n8n)
-│   ├── ragnar-system-prompt-with-citations.md  # Live n8n bot system prompt
+│   ├── system-prompt-with-citations.md  # Live n8n bot system prompt
 │   └── docs/
 │       ├── n8n-ranking-guide.md     # Code-boost vs. Cohere; full implementation
 │       └── n8n-code-snippets.md     # Boost, RRF, debug — ready to paste

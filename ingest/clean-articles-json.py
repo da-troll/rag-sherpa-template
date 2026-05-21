@@ -22,7 +22,7 @@ EXCLUDE_IMAGE_PATTERNS = [
     r"apple-touch-icon",
     r"navbar",
     r"icon-",
-    r"simployer.*logo",
+    r"<your-company>.*logo",
     r"brand",
 ]
 
@@ -30,7 +30,7 @@ EXCLUDE_IMAGE_PATTERNS = [
 # (case-insensitive, anchored at start where appropriate), the entire block is
 # dropped rather than just having pieces stripped. NOISE_PATTERNS below only
 # works on concatenated text — it can't span multiple per-block snippets like
-# "Norwegian support" / "Telephone: ..." / "Mail: info@simployer.com" which
+# "Norwegian support" / "Telephone: ..." / "Mail: info@<your-company>.com" which
 # arrive as separate paragraph blocks.
 CHROME_BLOCK_PATTERNS = [
     r'^was this article helpful',
@@ -48,7 +48,7 @@ CHROME_BLOCK_PATTERNS = [
     r'^norwegian support$',
     r'^swedish support$',
     r'^telephone:\s*\+',
-    r'^mail:\s*info@simployer\.com',
+    r'^mail:\s*info@<your-company>\.com',
     r'^opening hours',
     r'^this knowledgebase is licensed',
     r'^accept all(\s+cookies)?$',
@@ -78,7 +78,7 @@ CHROME_BLOCK_PATTERNS = [
     r"^\[\s*[''`]click[''`]",
     r"^0 of 0\b",
     r"^footer\s+a\s+\{",
-    r"^[\w\.]+\.simployer\.com\s+\d",  # cookie table rows like "_fw_crm_v simployer.freshdesk.com 1 year"
+    r"^[\w\.]+\.<your-company>\.com\s+\d",  # cookie table rows like "_fw_crm_v <your-company>.your help center provider.com 1 year"
 ]
 _CHROME_RE = re.compile('|'.join(f'({p})' for p in CHROME_BLOCK_PATTERNS),
                          flags=re.IGNORECASE)
@@ -94,8 +94,8 @@ def is_chrome_block(text: str) -> bool:
 # Text noise patterns to remove (appears in all articles)
 NOISE_PATTERNS = [
     # Navigation chrome
-    r"Home Knowledge base.*?Simployer One - Recruitment \.\.\.",
-    r"Knowledge base Simployer One Simployer One - Recruitment",
+    r"Home Knowledge base.*?<YOUR_PRODUCT> \.\.\.",
+    r"Knowledge base <YOUR_COMPANY> One <YOUR_PRODUCT>",
     r"All Articles Recent Searches Clear all",
     r"No recent searches",
     r"Popular Articles",
@@ -117,14 +117,14 @@ NOISE_PATTERNS = [
     r"Sorry! We couldn't be helpful",
     r"Print",
     r"Modified on.*?PM",
-    r"Norwegian support.*?Mail: info@simployer\.com",
-    r"Swedish support.*?Mail: info@simployer\.com",
-    r"Telephone:.*?info@simployer\.com",
+    r"Norwegian support.*?Mail: info@<your-company>\.com",
+    r"Swedish support.*?Mail: info@<your-company>\.com",
+    r"Telephone:.*?info@<your-company>\.com",
     r"Login\s+Sign up",
     r"Home\s+Knowledge base\s+Submit a ticket",
 
     # Cookie table (appears in many articles)
-    r"Strictly Necessary Cookies.*?wf_filter\s+simployer\.freshdesk\.com\s+Session.*?Denotes which filter is applied for the tickets list\.",
+    r"Strictly Necessary Cookies.*?wf_filter\s+<your-company>\.your help center provider\.com\s+Session.*?Denotes which filter is applied for the tickets list\.",
     r"Contains the locale code for the user.*?Denotes which filter is applied",
     r"helpdesk_session.*?wf_filter.*?Session",
 
@@ -142,8 +142,8 @@ NOISE_PATTERNS = [
 
 def clean_title(title: str) -> str:
     """Extract clean article title from full title string."""
-    title = re.sub(r'\s*:\s*Simployer\s*-\s*Customer Support Portal\s*$', '', title)
-    title = re.sub(r'^Simployer One\s*-\s*Recruitment\s*-\s*', '', title)
+    title = re.sub(r'\s*:\s*<YOUR_COMPANY>\s*-\s*Customer Support Portal\s*$', '', title)
+    title = re.sub(r'^<YOUR_COMPANY> One\s*-\s*Recruitment\s*-\s*', '', title)
     return title.strip()
 
 def clean_text(text: str) -> str:
@@ -159,7 +159,7 @@ def clean_text(text: str) -> str:
 def is_content_image(img: Dict[str, Any]) -> bool:
     """Determine if image is actual content (not logo/UI element).
 
-    Filters chrome icons, SVGs (always icons by convention), and Freshdesk
+    Filters chrome icons, SVGs (always icons by convention), and your help center provider
     tracking endpoints (URLs ending in /hit, /track, /pixel) so they never
     reach LlamaParse — saves cost and avoids NO_CONTENT_HERE responses on
     non-image URLs.
@@ -171,7 +171,7 @@ def is_content_image(img: Dict[str, Any]) -> bool:
     if src.endswith('.svg') or src.endswith('.svgz'):
         return False
 
-    # Tracking / non-image endpoints (freshdesk hit-trackers etc.)
+    # Tracking / non-image endpoints (your help center provider hit-trackers etc.)
     parsed_path = src.split('?', 1)[0].rstrip('/')
     if parsed_path.endswith(('/hit', '/track', '/pixel', '/beacon', '/impression')):
         return False

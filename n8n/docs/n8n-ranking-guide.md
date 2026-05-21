@@ -16,11 +16,11 @@ n8n's Pinecone Vector Store node has limitations:
 
 Your Pinecone vectors have these boolean metadata fields for boosting:
 - **`has_trusted`**: Content from verified sources (SMEs, official docs)
-- **`has_recruitment_reaction`**: Validated by team (Slack `:recruitment:` emoji)
+- **`has_primary_tag`**: Validated by team (Slack `:verified:` emoji)
 
 ### Goal
 
-Boost search results that have `has_trusted=true` or `has_recruitment_reaction=true` to appear higher in rankings, while still allowing other results.
+Boost search results that have `has_trusted=true` or `has_primary_tag=true` to appear higher in rankings, while still allowing other results.
 
 ---
 
@@ -76,7 +76,7 @@ Boost search results that have `has_trusted=true` or `has_recruitment_reaction=t
 ```javascript
 // ===== CONFIGURATION =====
 const TRUSTED_BOOST = 1.5;      // 50% boost for trusted sources
-const REACTION_BOOST = 1.3;     // 30% boost for recruitment reactions
+const REACTION_BOOST = 1.3;     // 30% boost for primary-tag reactions
 const COMBINED_BOOST = 2.0;     // 100% boost when both are true
 const TOP_N_RESULTS = 5;        // Number of results to return
 
@@ -89,7 +89,7 @@ function applyBoost(item) {
 
   // Check metadata flags
   const hasTrusted = metadata.has_trusted === true;
-  const hasReaction = metadata.has_recruitment_reaction === true;
+  const hasReaction = metadata.has_primary_tag === true;
 
   // Determine boost multiplier
   let boost = 1.0;
@@ -189,7 +189,7 @@ Run **three parallel Pinecone queries** with different strategies, then merge us
 
 1. **Query A**: Pure semantic search (no filters)
 2. **Query B**: Filtered by `has_trusted=true`
-3. **Query C**: Filtered by `has_recruitment_reaction=true`
+3. **Query C**: Filtered by `has_primary_tag=true`
 4. **Merge**: Combine using RRF algorithm with weights
 
 ### n8n Workflow Structure
@@ -231,7 +231,7 @@ Add three **Pinecone Vector Store** nodes in parallel:
 **Node 3: Reaction Filter**
 - Name: `Reaction Filter`
 - Top K: `10`
-- Metadata filter: `{"has_recruitment_reaction": {"$eq": true}}`
+- Metadata filter: `{"has_primary_tag": {"$eq": true}}`
 - Include metadata: `true`
 
 #### Step 2: Add RRF Merge Code Node
@@ -410,12 +410,12 @@ Replace the Pinecone Vector Store node with an **HTTP Request** node:
   "filter": {
     "$or": [
       {"has_trusted": {"$eq": true}},
-      {"has_recruitment_reaction": {"$eq": true}}
+      {"has_primary_tag": {"$eq": true}}
     ]
   },
   "topK": 20,
   "includeMetadata": true,
-  "namespace": "recruitment-rag"
+  "namespace": "your-namespace"
 }
 ```
 
@@ -427,7 +427,7 @@ Replace the Pinecone Vector Store node with an **HTTP Request** node:
   "filter": {
     "$or": [
       {"has_trusted": {"$eq": true}},
-      {"has_recruitment_reaction": {"$eq": true}}
+      {"has_primary_tag": {"$eq": true}}
     ]
   }
 }
@@ -439,7 +439,7 @@ Replace the Pinecone Vector Store node with an **HTTP Request** node:
   "filter": {
     "$and": [
       {"has_trusted": {"$eq": true}},
-      {"has_recruitment_reaction": {"$eq": true}}
+      {"has_primary_tag": {"$eq": true}}
     ]
   }
 }
@@ -453,7 +453,7 @@ Replace the Pinecone Vector Store node with an **HTTP Request** node:
       {"has_trusted": {"$eq": true}},
       {
         "$and": [
-          {"has_recruitment_reaction": {"$eq": true}},
+          {"has_primary_tag": {"$eq": true}},
           {"message_count": {"$gt": 5}}
         ]
       }
@@ -466,7 +466,7 @@ Replace the Pinecone Vector Store node with an **HTTP Request** node:
 ```json
 {
   "filter": {
-    "authors": {"$in": ["U082LELDMBN", "U077C51J0UW"]}
+    "authors": {"$in": ["U0000000001", "U077C51J0UW"]}
   }
 }
 ```
@@ -484,12 +484,12 @@ The Pinecone API returns results in this format:
       "metadata": {
         "text": "...",
         "has_trusted": true,
-        "has_recruitment_reaction": true,
+        "has_primary_tag": true,
         ...
       }
     }
   ],
-  "namespace": "recruitment-rag"
+  "namespace": "your-namespace"
 }
 ```
 
@@ -526,7 +526,7 @@ return matches.map(match => ({
 You might see n8n's native Cohere reranker node and think it's a good option. **For this use case, it's not recommended:**
 
 **Problems with external rerankers for metadata-driven ranking:**
-- ❌ **Zero customizability**: Can't tell Cohere to prioritize `has_trusted` or `has_recruitment_reaction`
+- ❌ **Zero customizability**: Can't tell Cohere to prioritize `has_trusted` or `has_primary_tag`
 - ❌ **Metadata noise**: n8n automatically sends ALL metadata to reranker, which can confuse semantic scoring
 - ❌ **Black box**: No control over scoring weights or logic
 - ❌ **Ignores quality signals**: Cohere does semantic similarity only, ignores your explicit quality metadata

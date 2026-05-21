@@ -4,7 +4,7 @@
 
 ## Why this experiment exists
 
-The `slack-to-pc.py` pipeline filters out bot/app-authored Slack messages at ingest time, so Ragnar's own historical answers (347+ replies in the corpus at time of writing) never become vectors. The rationale stated in code is:
+The `slack-to-pc.py` pipeline filters out bot/app-authored Slack messages at ingest time, so RAG Bot's own historical answers (347+ replies in the corpus at time of writing) never become vectors. The rationale stated in code is:
 
 > Bot messages must NOT be re-ingested as authoritative answers — they were generated FROM the index, and feeding them back risks closed-loop drift.
 
@@ -12,7 +12,7 @@ That rationale is **theoretically sound** — closed-loop drift is a known failu
 
 ## Hypothesis
 
-**H1:** Re-ingesting Ragnar's own bot replies into the index measurably degrades retrieval quality.
+**H1:** Re-ingesting RAG Bot's own bot replies into the index measurably degrades retrieval quality.
 
 **Null (H0):** It doesn't — bot answers are accurate enough that re-embedding them is neutral or even mildly helpful (more paraphrase coverage → broader semantic match).
 
@@ -24,7 +24,7 @@ Two-namespace A/B with everything else held identical. The only difference is wh
 
 | Aspect | Control (current production) | Variable |
 | --- | --- | --- |
-| Namespace | `recruitment-rag-3` | `recruitment-rag-3-bot-experiment` |
+| Namespace | `your-namespace` | `your-namespace-experiment` |
 | Slack bot-message filter | ON (default) | **OFF** (`SLACK_INCLUDE_BOTS=1`) |
 | Articles ingest | already in rag-3 | re-ingest into experiment namespace |
 | Contextual retrieval | ON | ON |
@@ -57,7 +57,7 @@ The articles need to be present in the same namespace so the eval has a complete
 ```bash
 # Temporarily override the namespace + tell Slack to include bots
 # (article ingest doesn't read SLACK_INCLUDE_BOTS — it's a no-op for this step)
-PINECONE_NAMESPACE=recruitment-rag-3-bot-experiment ./run python articles-to-pc.py
+PINECONE_NAMESPACE=your-namespace-experiment ./run python articles-to-pc.py
 ```
 
 Cost: ~$0.10 contextual retrieval + standard embedding. Time: ~2 min.
@@ -65,7 +65,7 @@ Cost: ~$0.10 contextual retrieval + standard embedding. Time: ~2 min.
 ### 2. Ingest Slack with the bot filter OFF
 
 ```bash
-PINECONE_NAMESPACE=recruitment-rag-3-bot-experiment \
+PINECONE_NAMESPACE=your-namespace-experiment \
 SLACK_INCLUDE_BOTS=1 \
 ./run python slack-to-pc.py
 ```
@@ -80,7 +80,7 @@ Cost: ~$0.30 contextual retrieval + standard embedding. Time: ~10 min.
 
 ```bash
 ./run python eval/run_eval.py \
-  --namespace recruitment-rag-3-bot-experiment \
+  --namespace your-namespace-experiment \
   --output eval/results/bot-experiment.json
 ```
 
@@ -124,7 +124,7 @@ import os
 from pinecone import Pinecone
 pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
 idx = pc.Index(host=os.getenv('PINECONE_HOST')) if os.getenv('PINECONE_HOST') else pc.Index(os.getenv('PINECONE_INDEX'))
-idx.delete(delete_all=True, namespace='recruitment-rag-3-bot-experiment')
+idx.delete(delete_all=True, namespace='your-namespace-experiment')
 print('deleted')
 "
 ```
@@ -170,16 +170,16 @@ The MRR delta of −0.113 is roughly **2× the contextual-retrieval variance flo
 
 ### Magnitude of the lift the filter provides
 
-- ~20 pts on R@1 (the metric that matters most for "did Ragnar surface the right doc immediately")
+- ~20 pts on R@1 (the metric that matters most for "did RAG Bot surface the right doc immediately")
 - ~5 pts on R@5 and R@10 (steady mid-range improvement)
 - ~0.11 on MRR (correct results sit at higher ranks)
 - Most dramatically: **q010 went from rank 4 to outside the top 10** when bots were included. The bot's prior answer about privacy policy outcompeted the actual privacy policy article.
 
 ### Why the bot's replies are so competitive
 
-The 6:1 worse-vs-better ratio is the signature finding. Ragnar's archived answers aren't just *neutral* re-ingested text — they actively crowd out the canonical sources. The mechanism:
+The 6:1 worse-vs-better ratio is the signature finding. RAG Bot's archived answers aren't just *neutral* re-ingested text — they actively crowd out the canonical sources. The mechanism:
 
-1. Ragnar's answers were generated FROM the index, conditioned on user questions
+1. RAG Bot's answers were generated FROM the index, conditioned on user questions
 2. Each answer is therefore written in the shape of "answer to a question like Q"
 3. When re-embedded, those answers have very high semantic similarity to questions like Q — *higher* than the canonical source documents they were derived from, because the source documents weren't written to match question phrasings
 4. So bot answers win the cosine match for paraphrase-style retrieval — replacing ground-truth with derivative
@@ -190,7 +190,7 @@ This is the closed-loop drift pattern materializing in a single iteration. Every
 
 **Keep the filter on. Permanently.** Document it as a load-bearing component of the ingest pipeline, not a defensive choice.
 
-The original defensive framing (theoretical concern about feedback loops) understated the case. The data shows the filter is responsible for ~20% of R@1 and ~15% of MRR. Removing it would meaningfully degrade Ragnar's bot quality in production.
+The original defensive framing (theoretical concern about feedback loops) understated the case. The data shows the filter is responsible for ~20% of R@1 and ~15% of MRR. Removing it would meaningfully degrade RAG Bot's bot quality in production.
 
 ### What's the next experiment worth running?
 
@@ -198,7 +198,7 @@ Three candidates, ordered by potential impact:
 
 1. **Reranker after metadata boost** (Tier 2.1 in `RAG_IMPROVEMENTS_PLAN.md`). Voyage rerank-2-lite or Cohere rerank-3.5 as a final-stage reranker should mostly close the 4 remaining lexical-mismatch misses (q012, q018, q019, q020) — those are the questions chunk-tuning can't fix because the right vectors aren't even in the top-100. Reranker territory.
 2. **Query rewriting / HyDE for short queries** — generates a hypothetical answer at retrieval time, embeds that for search. Targeted at the same 4 hard-miss questions. Adds latency + an LLM call per query; probably overkill if reranker already fixes them.
-3. **Sentiment-reaction signal recovery experiment** — the bot took over so heavily after Oct 2025 that human endorsement reactions decayed to near-zero on new threads. With Ragnar's answers now filtered out of the index, do humans return to endorsing each other's answers? If yes, the `:recruitment:` and similar manual signals might recover organically. Long-horizon observation, not a controlled test.
+3. **Sentiment-reaction signal recovery experiment** — the bot took over so heavily after Oct 2025 that human endorsement reactions decayed to near-zero on new threads. With RAG Bot's answers now filtered out of the index, do humans return to endorsing each other's answers? If yes, the `:verified:` and similar manual signals might recover organically. Long-horizon observation, not a controlled test.
 
 ### Limitations of this experiment
 

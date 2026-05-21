@@ -6,8 +6,8 @@ Guidance for Claude Code when working in this repo. Human-readable docs live in 
 
 RAG ingestion pipeline that pushes two content sources into a Pinecone index:
 
-1. **Slack** — exported messages/threads from a recruitment support channel
-2. **Help center articles** — scraped from Freshdesk, cleaned, then converted to LlamaParse markdown
+1. **Slack** — exported messages/threads from a your support channel
+2. **Help center articles** — scraped from your help center provider, cleaned, then converted to LlamaParse markdown
 
 Embeddings: OpenAI `text-embedding-3-small` (1536 dim). Vector store: Pinecone.
 
@@ -59,8 +59,8 @@ Embeddings: OpenAI `text-embedding-3-small` (1536 dim). Vector store: Pinecone.
 │   └── bot-self-ingestion-drift.md    # A/B finding: bot filter ≈ +20 R@1 / +0.113 MRR
 │
 ├── n8n/                               # Bot workflow + system prompt + retrieval notes
-│   ├── n8n-workflow.json              # The exported workflow (Webhook → boost → Ragnar)
-│   ├── ragnar-system-prompt-with-citations.md  # Live system prompt
+│   ├── n8n-workflow.json              # The exported workflow (Webhook → boost → RAG Bot)
+│   ├── system-prompt-with-citations.md  # Live system prompt
 │   └── docs/
 │       ├── n8n-ranking-guide.md       # Why code-boost, not Cohere; full implementation
 │       └── n8n-code-snippets.md       # Ready-to-paste JS (boost, RRF, debug)
@@ -84,18 +84,18 @@ All scripts in `ingest/`, `diagnostics/`, and `experiments/` inject the repo roo
 
 ```
 # --- 1Password references (resolved by ./run wrapper) ---
-OPENAI_API_KEY=op://Employee/uw6soelyqjqerwkogprxr7t4ia/api key
-SLACK_TOKEN=op://Employee/fe7qwdxozznsegta7vdtkeyv7m/credential
-PINECONE_API_KEY=op://Employee/575iu6gscslfu6dbmtgzvpi6hy/credential
-LLAMA_CLOUD_API_KEY=op://Employee/lnhrdmv73rtdgb6ew53wqhmewu/credential
+OPENAI_API_KEY=op://<YOUR_VAULT>/OpenAI API Key/api key
+SLACK_TOKEN=op://<YOUR_VAULT>/Slack Bot Token/credential
+PINECONE_API_KEY=op://<YOUR_VAULT>/Pinecone API Key/credential
+LLAMA_CLOUD_API_KEY=op://<YOUR_VAULT>/LlamaCloud API Key/credential
 
 # --- Plain values (config, not secrets) ---
 PINECONE_INDEX=
 PINECONE_NAMESPACE=
 SLACK_CHANNEL_ID=
 SLACK_JSON_PATH=
-SLACK_WORKSPACE_HOST=https://simployer.slack.com
-TRUSTED_USERS={U082LELDMBN,...}
+SLACK_WORKSPACE_HOST=https://your-workspace.slack.com
+TRUSTED_USERS={U0000000001,...}
 EMBED_MODEL=text-embedding-3-small
 BATCH_SIZE=64
 
@@ -136,12 +136,12 @@ If `.env` contains zero `op://` references (user replaced them all with plain va
 ### Slack pipeline
 
 1. `./run python ingest/fetch-all-messages.py` — pulls all messages + threads, writes `data/slack/slack_<CHANNEL_ID>.json`.
-2. `./run python diagnostics/p90-calc-slack.py` *(optional)* — diagnostic. Prints char-length percentiles of `:recruitment:`-tagged threads.
+2. `./run python diagnostics/p90-calc-slack.py` *(optional)* — diagnostic. Prints char-length percentiles of `:verified:`-tagged threads.
 3. `./run python ingest/slack-to-pc.py` — produces two vector types per thread, after filtering out system-event parents (channel_join, channel_name, etc.):
    - **`thread_synth`** (single vector): question (parent) + best 2 answers, prioritizing trusted users.
    - **Full thread chunks**: char-windowed conversation with overlap. With `CONTEXTUAL_RETRIEVAL=1`, each chunk gets a 1-2 sentence LLM-generated situating context prepended; synth vectors are not contextualized.
 
-   Each vector carries `has_recruitment_reaction` (boolean) for n8n boost code — see Slack vector metadata schema below.
+   Each vector carries `has_primary_tag` (boolean) for n8n boost code — see Slack vector metadata schema below.
 
 ### Help center articles pipeline
 
@@ -173,7 +173,7 @@ Applied to: all article chunks; full-thread Slack chunks. **Not** applied to Sla
   "source": "slack",
   "channel_id": "<id>",
   "thread_ts": "<timestamp>",
-  "permalink": "https://simployer.slack.com/archives/<channel>/p<ts>",
+  "permalink": "https://your-workspace.slack.com/archives/<channel>/p<ts>",
   "authors": ["U123", "U456"],
   "ts_first": "<iso>",
   "ts_last": "<iso>",
@@ -182,8 +182,8 @@ Applied to: all article chunks; full-thread Slack chunks. **Not** applied to Sla
   "chunk_strategy": "chars1500_overlap300",
   "has_trusted": true,
   "has_answer_like": true,
-  "has_recruitment_reaction": true,
-  "trusted_repliers": ["U082LELDMBN"],
+  "has_primary_tag": true,
+  "trusted_repliers": ["U0000000001"],
   "trusted_count": 1,
   "text": "<chunk>",
   "doc_type": "thread_synth",
@@ -192,13 +192,13 @@ Applied to: all article chunks; full-thread Slack chunks. **Not** applied to Sla
 ```
 
 **Slack ingest filtering and signals:**
-- Parents whose `subtype` is in `{channel_join, channel_leave, channel_name, channel_topic, channel_purpose, channel_archive, channel_unarchive, thread_broadcast}` are dropped before any vector is built — these system events used to pollute retrieval with embeddings of strings like `"<@U082LELDMBN> has joined the channel"`.
-- **Bot/app messages are filtered out of every reply list** (predicate: `bot_id` set, `app_id` set, or `subtype == "bot_message"`). The Ragnar bot itself answers in this channel, so without the filter its own answers — generated *from* the index — would be re-embedded and re-indexed, creating a closed-loop feedback amplifier. On the current corpus this drops 347+ replies authored by the bot.
-- `has_recruitment_reaction` (boolean) — true if the parent or any reply has the `:recruitment:` reaction. This is the **only** quality signal surfaced in metadata at ingest time. Rationale:
-  - `:recruitment:` is a deliberate curation tag applied by the SME owner to mark threads as verified content for RAG. Its presence is the verified-content signal.
-  - Multiplicity is NOT signal: additional `:recruitment:` reactions on the same thread are typically other team members echoing the SME's tag — they don't add verification beyond the first. So presence-or-not, not count.
+- Parents whose `subtype` is in `{channel_join, channel_leave, channel_name, channel_topic, channel_purpose, channel_archive, channel_unarchive, thread_broadcast}` are dropped before any vector is built — these system events used to pollute retrieval with embeddings of strings like `"<@U0000000001> has joined the channel"`.
+- **Bot/app messages are filtered out of every reply list** (predicate: `bot_id` set, `app_id` set, or `subtype == "bot_message"`). The RAG Bot bot itself answers in this channel, so without the filter its own answers — generated *from* the index — would be re-embedded and re-indexed, creating a closed-loop feedback amplifier. On the current corpus this drops 347+ replies authored by the bot.
+- `has_primary_tag` (boolean) — true if the parent or any reply has the `:verified:` reaction. This is the **only** quality signal surfaced in metadata at ingest time. Rationale:
+  - `:verified:` is a deliberate curation tag applied by the SME owner to mark threads as verified content for RAG. Its presence is the verified-content signal.
+  - Multiplicity is NOT signal: additional `:verified:` reactions on the same thread are typically other team members echoing the SME's tag — they don't add verification beyond the first. So presence-or-not, not count.
   - Other reactions (`:+1:`, `:raised_hands:`, `:rocket:`, etc.) are explicitly NOT counted as quality signals. They fire ambiguously on launch announcements, sympathy, agreement, and "thanks" — corrupting any signal they'd contribute. Popularity is not relevance.
-  - n8n boost code is the right place to apply weight: multiply scores by a constant when `has_recruitment_reaction == true`.
+  - n8n boost code is the right place to apply weight: multiply scores by a constant when `has_primary_tag == true`.
 
 ### Help center vectors
 
@@ -225,9 +225,9 @@ Applied to: all article chunks; full-thread Slack chunks. **Not** applied to Sla
 
 `TRUSTED_USERS` env var lists SME Slack IDs. Their replies are prioritized in synthetic thread summaries. `has_trusted`, `trusted_repliers`, and `trusted_count` are emitted in metadata for downstream boosting.
 
-## Recruitment Reaction Tracking
+## Primary Tag Tracking
 
-`has_recruitment_reaction` is true when the parent or any reply has a `:recruitment:` reaction. Reaction strings are also embedded in the chunk text (e.g., `:recruitment:x3`).
+`has_primary_tag` is true when the parent or any reply has a `:verified:` reaction. Reaction strings are also embedded in the chunk text (e.g., `:verified:x3`).
 
 ## n8n Retrieval
 
@@ -236,10 +236,10 @@ The exported workflow lives at `n8n/n8n-workflow.json`. It is **not** a Vector S
 ```
 [Slack Webhook] → [Bot vs. User] → [Fetch Slack Thread] → [Parse Context]
   → [Classifier: question?] → [Pinecone top 20] → [Metadata Boost (Code)]
-  → [top 10 chunks] → [Ragnar agent] → [Send thread reply]
+  → [top 10 chunks] → [RAG Bot agent] → [Send thread reply]
 ```
 
-The **Metadata Boost** node returns a single item with a `chunks` array (not 10 items) — emitting 10 items caused the agent to run 10× and broke `.item` pairing. Downstream nodes reference it via `.first()`, not `.item`. Boost code keys on `has_recruitment_reaction` (×1.40), `has_trusted` (×1.30), plus smaller multipliers for `has_images`, `synth`, and multi-SME threads.
+The **Metadata Boost** node returns a single item with a `chunks` array (not 10 items) — emitting 10 items caused the agent to run 10× and broke `.item` pairing. Downstream nodes reference it via `.first()`, not `.item`. Boost code keys on `has_primary_tag` (×1.40), `has_trusted` (×1.30), plus smaller multipliers for `has_images`, `synth`, and multi-SME threads.
 
 See:
 - `n8n/docs/n8n-ranking-guide.md` — full implementation guide (why code-boost, not Cohere)
@@ -250,7 +250,7 @@ Recommended flow: `[Webhook] → [Pinecone: top 20] → [Code: boost on metadata
 ## Pinecone Index
 
 - Dimension: 1536 (matches `text-embedding-3-small`)
-- Namespaces: separate logical collections (e.g., `recruitment-rag`)
+- Namespaces: separate logical collections (e.g., `your-namespace`)
 - All scripts verify `index.dimension == 1536` on startup.
 
 ## Common Tasks

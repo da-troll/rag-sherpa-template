@@ -41,13 +41,13 @@ from bs4 import BeautifulSoup
 LISTING_URLS_ENV = os.getenv("HELP_CENTER_LISTING_URLS", "")
 DEFAULT_DELAY = float(os.getenv("SCRAPE_DELAY_SECONDS", "1.5"))
 USER_AGENT = os.getenv("SCRAPE_USER_AGENT",
-                       "Mozilla/5.0 (compatible; recruitment-rag-scraper/0.1; +https://github.com/da-troll)")
+                       "Mozilla/5.0 (compatible; your-namespace-scraper/0.1; +https://github.com/da-troll)")
 
 OUTPUT_JSON = Path("data/articles/scraped_help_articles.json")
 CACHE_DIR = Path("data/articles/.cache")
 
-# Article URL pattern — overridable for non-Freshdesk help centers (Zendesk, Notion, etc.)
-# Default matches Freshdesk's /support/solutions/articles/<id>-<slug> shape.
+# Article URL pattern — overridable for non-your help centers (Zendesk, Notion, etc.)
+# Default matches your help center provider's /support/solutions/articles/<id>-<slug> shape.
 ARTICLE_URL_PATTERN = os.getenv(
     "SCRAPE_ARTICLE_URL_PATTERN",
     r'/(?:[a-z]{2,5}/)?support/solutions/articles/\d+[^"#?]*'

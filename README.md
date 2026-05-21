@@ -1,8 +1,27 @@
-# Recruitment RAG Bot
+# Multi-source Slack RAG bot template
 
-A small ingestion pipeline that turns two messy sources of internal knowledge — a Slack support channel and a your help center — into clean, searchable vectors in Pinecone. An n8n workflow then queries those vectors to power **RAG Bot**, our recruitment Q&A bot.
+A starter template for building a domain Q&A bot that ingests one or more text-based content sources into Pinecone and serves answers via an n8n workflow. Two source types ship by default:
+
+1. **Slack threads** — discussions from a support channel (questions + answers, often with curation reactions).
+2. **Structured articles** — markdown documentation (scraped from a help center, exported from Notion/Confluence, or any markdown corpus).
 
 The pipeline is **manual and step-by-step**: each stage is a separate Python script that reads a file, does one thing, and writes the next file. You run them in order. No orchestration, no scheduler, no surprises.
+
+The bot itself runs in n8n: retrieve top-K from Pinecone, re-rank with a small JS Code node using tenant-defined metadata signals, hand the top 10 chunks to an LLM, post the answer back to Slack.
+
+---
+
+## Make this your own
+
+Five edits get you from a fresh clone to a working bot:
+
+1. **Configure secrets and tenant values.** `cp .env.example .env`, then fill in placeholders (`<YOUR_VAULT>` 1Password references or plain values, your Pinecone index/namespace, your Slack channel ID and workspace host, your trusted-user Slack IDs).
+2. **Customize the bot persona.** Edit `prompts/persona.example.md` — bot name, scope statement, voice. This is the single highest-leverage edit.
+3. **Wire up n8n credentials.** Import `n8n/n8n-workflow.json` into your n8n instance; create three credentials with the placeholder names (`YOUR_OPENAI_CREDENTIAL`, `YOUR_PINECONE_CREDENTIAL`, `YOUR_SLACK_OAUTH_CREDENTIAL`). See `n8n/README-import.md` for the full 10-step walkthrough.
+4. **Ingest your content.** Run the Slack and articles pipelines (described below). Optionally re-tune chunk sizes against your own corpus with `diagnostics/p90-calc-*.py`.
+5. **Measure quality.** Replace `eval/questions.json` with a labeled set from your own data (see `eval/HOW_TO_LABEL.md`). Run `./run python eval/run_eval.py` to baseline retrieval quality before/after changes.
+
+For deeper customization — boost weights, source plugins, prompt extensions — see `CLAUDE.md`.
 
 ---
 
@@ -191,11 +210,11 @@ Before any vector is built, the script **filters out:**
 The experimental override `SLACK_INCLUDE_BOTS=1` (or `--include-bots` CLI flag) disables the filter — used only by the bot-drift A/B experiment and not for production.
 
 Every vector carries metadata the n8n bot uses for ranking:
-- `has_trusted` / `trusted_count` / `trusted_repliers` — SME participation signal (curation-independent)
-- `has_primary_tag` — explicit `:verified:` tag (depends on someone tagging threads)
-- `has_primary_tag` — true when the parent or any reply carries the `:verified:` reaction. This is the **only** quality signal in metadata. Presence-only (not count): additional `:verified:` reactions are typically other team members echoing the SME's tag — they don't add verification. Other reactions (`:+1:`, `:raised_hands:`, etc.) are not used as signal at all — they fire too ambiguously on announcements and sympathy to be reliable for retrieval. The n8n boost code is where the weight gets applied (multiply by a constant when this flag is true).
-- `ts_last` / `ts_first` — for recency decay in boost
-- `permalink` — for citations
+- `tags` — list of curation tag names. Contains the primary tag (e.g. `"verified"`) when the parent or any reply carries the configured `PRIMARY_REACTION_TAG` reaction. This is the **only** curation signal in metadata. Presence-only (not count): additional same-tag reactions are typically other team members echoing the curator — they don't add verification. Other reactions (`:+1:`, `:raised_hands:`, etc.) are explicitly NOT counted — they fire too ambiguously on announcements and sympathy to be reliable.
+- `author_roles` — dict of role name → count (e.g. `{"trusted": 2}`). Roles are extensible: add a new entry to `ROLE_DEFINITIONS` in `ingest/slack-to-pc.py` to surface additional role memberships (on-call, leads, escalations) without schema changes.
+- `author_role_ids` — same shape as `author_roles` but carries the actual Slack IDs per role. Used for citation-time formatting like "answered by on-call engineer".
+- `ts_last` / `ts_first` — for recency decay in boost.
+- `permalink` — for citations.
 
 ---
 
@@ -284,7 +303,7 @@ The bot itself lives in n8n; the exported workflow is `n8n/n8n-workflow.json`. I
   → [top 10 chunks] → [RAG Bot agent] → [Send thread reply]
 ```
 
-The boost code keys on `has_primary_tag` (×1.40), `has_trusted` (×1.30), plus smaller multipliers for `has_images`, `synth`, and multi-SME threads. The node returns a **single item** with a `chunks` array (not 10 items, which would cause the agent to run 10× and break pairing); downstream references use `.first()` instead of `.item`.
+The boost code keys on `tags` containing the primary tag (×1.40), `author_roles.trusted > 0` (×1.30), `author_roles.trusted > 1` (×1.05 multi-trusted), plus smaller multipliers for `has_images` and `synth`/`thread_synth`. The node returns a **single item** with a `chunks` array (not N items, which would cause the agent to run N× and break pairing); downstream references use `.first()` instead of `.item`.
 
 Implementation notes and copy-paste snippets:
 
@@ -296,10 +315,9 @@ Implementation notes and copy-paste snippets:
 ## Project structure
 
 ```
-recruitment/
-├── README.md                  # This file — human-facing pipeline guide
+slack-rag-bot-template/
+├── README.md                  # This file — human-facing template guide
 ├── CLAUDE.md                  # LLM-agent-oriented version of the same spec
-├── GENERICIZATION_PLAN.md     # Audit of use-case-specific assumptions + roadmap
 ├── .env.example               # Committed seed: op:// refs + sensible plain defaults
 ├── run                        # Wrapper: `op run --env-file=.env -- "$@"`
 ├── requirements.txt
@@ -319,33 +337,36 @@ recruitment/
 │   ├── p90-calc-slack.py      # Slack thread length percentiles
 │   └── p90-calc-articles.py   # Article + H2/H3 section size percentiles
 │
-├── data/                      # Raw + intermediate corpus (gitignored content)
-│   ├── slack/                 # Slack JSON dumps
-│   └── articles/              # scraped → cleaned → markdown JSON + .cache/
+├── data/                      # Your corpus lands here (contents gitignored;
+│   ├── slack/                 #  ships with empty dirs + sample article JSON
+│   └── articles/              #  for the smoke test)
 │
 ├── eval/                      # Retrieval-quality harness — measure changes, don't guess
 │   ├── run_eval.py            # Recall@K + MRR against questions.json
-│   ├── questions.json         # 20 labeled questions w/ expected doc_id matches
+│   ├── questions.json         # 3 starter synthetic questions (REPLACE with your own)
+│   ├── HOW_TO_LABEL.md        # Guide to building your own question set
 │   ├── README.md              # How to run, interpret, extend
-│   └── results/               # Per-run JSON (mostly gitignored)
+│   └── results/sample.json    # Example output format (other runs are gitignored)
 │
 ├── experiments/               # Reproducible experiments + their write-ups
 │   ├── article_chunk_sweep.py        # Sweep harness: re-ingest at N caps, re-eval
-│   ├── article-chunk-cap-sweep.md    # Finding: cap=1000 wins on R@5 (80%) and MRR (0.688)
-│   └── bot-self-ingestion-drift.md   # Finding: bot filter ≈ +20 R@1 / +0.113 MRR
+│   ├── article-chunk-cap-sweep.md    # Methodology + finding from the original corpus
+│   └── bot-self-ingestion-drift.md   # Bot-filter A/B that proved the filter is load-bearing
 │
-├── n8n/                       # Bot workflow + system prompt + integration docs
-│   ├── n8n-workflow.json                       # Exported workflow (import into n8n)
-│   ├── system-prompt-with-citations.md  # Live n8n bot system prompt
-│   └── docs/
-│       ├── n8n-ranking-guide.md     # Code-boost vs. Cohere; full implementation
-│       └── n8n-code-snippets.md     # Boost, RRF, debug — ready to paste
+├── prompts/                   # Modular system-prompt parts (concat → n8n agent node)
+│   ├── persona.example.md           # Bot name, scope, voice — TENANT-OWNED
+│   ├── citation-format.md           # Generic citation pattern
+│   ├── source-descriptions/
+│   │   ├── slack.md                 # How Slack vectors look + how to cite
+│   │   └── articles.md              # How article vectors look + how to cite
+│   └── README.md                    # Concat order + dynamic-loading option
 │
-└── archive/                   # Past iterations — kept for reference, never run
-    ├── pc-init.py             # Old Pinecone sanity stub
-    ├── articles/              # Old chunk_plan.json (replaced by header-aware chunker)
-    ├── articles-txt/          # Pre-LlamaParse raw articles
-    └── message-fetches/       # Old Slack export staging
+└── n8n/                       # Bot workflow + import guide + integration docs
+    ├── n8n-workflow.json            # Exported workflow (import into n8n)
+    ├── README-import.md             # 10-step setup guide for a fresh n8n instance
+    └── docs/
+        ├── n8n-ranking-guide.md     # Code-boost vs. Cohere; full implementation
+        └── n8n-code-snippets.md     # Boost, RRF, debug — ready to paste
 ```
 
 All scripts in `ingest/`, `diagnostics/`, and `experiments/` inject the repo root into `sys.path` at startup so `contextual_retrieval` and `styling` resolve as top-level imports.

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Diagnostic: analyze recruitment-tagged Slack thread lengths to inform
-CHUNK_CHARS / CHUNK_OVERLAP for slack-to-pc.py. Read-only.
+Diagnostic: analyze primary-tagged Slack thread lengths to inform
+SLACK_CHUNK_CHARS / SLACK_CHUNK_OVERLAP for ingest/slack-to-pc.py. Read-only.
+
+Only looks at threads carrying the configured PRIMARY_REACTION_TAG
+(default "verified") — those are the canonical "this is good content"
+threads, so chunk sizing should be optimized for their shape.
 """
 import os, sys, json
 import numpy as np
@@ -10,12 +14,13 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv(usecwd=True), override=False)  # parent env (op run) wins over .env literals
 
 SLACK_JSON_PATH = os.getenv("SLACK_JSON_PATH", "data/slack/slack_C0000000000.json")
+PRIMARY_REACTION_TAG = os.getenv("PRIMARY_REACTION_TAG", "verified").lower()
 if not os.path.exists(SLACK_JSON_PATH):
     sys.exit(f"SLACK_JSON_PATH not found: {SLACK_JSON_PATH} (set in .env)")
 
 def has_primary_tag(msg):
     for r in (msg.get("reactions") or []):
-        if (r.get("name") or "").lower() == "recruitment":
+        if (r.get("name") or "").lower().split("::", 1)[0] == PRIMARY_REACTION_TAG:
             return True
     return False
 
@@ -36,7 +41,7 @@ def length_stats():
     for k in by_t:
         by_t[k].sort(key=lambda x: float(x["ts"]))
 
-    # select parent messages with :verified: reaction
+    # select parent messages with the primary curation reaction
     parents = [m for m in msgs if is_parent(m) and has_primary_tag(m)]
 
     pairs = []
@@ -61,12 +66,12 @@ def length_stats():
         lengths.append(len(thread_text))
 
     if not lengths:
-        print("No recruitment threads found.")
+        print(f"No threads found with the :{PRIMARY_REACTION_TAG}: reaction.")
         return
 
     arr = np.array(lengths)
     pct = lambda q: int(np.percentile(arr, q))
-    print(f"Recruitment threads: {len(arr)}")
+    print(f"Threads tagged :{PRIMARY_REACTION_TAG}:: {len(arr)}")
     print(f"mean chars: {int(arr.mean())} | p50: {pct(50)} | p75: {pct(75)} | "
           f"p90: {pct(90)} | p95: {pct(95)} | max: {arr.max()}")
 

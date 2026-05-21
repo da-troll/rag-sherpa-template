@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Eval harness for the recruitment RAG retrieval layer.
+Eval harness for the RAG retrieval layer.
 
 Loads `questions.json`, embeds each question with the same model used at ingest
 time, queries Pinecone, and reports recall@k and MRR against the labeled

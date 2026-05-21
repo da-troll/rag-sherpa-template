@@ -1,6 +1,8 @@
 # Experiment: Article Chunk-Cap Sweep
 
-> **Status:** complete. Winner: **cap = 1000 chars**.
+> **Status:** completed on the corpus this template was built from. Winner there: **cap = 1000 chars**.
+>
+> **Re-run on your own corpus.** Findings below are illustrative — the optimal cap depends on your article shape (section length distribution, average chunk discriminability). The methodology, harness, and decision framework all generalize. Use `experiments/article_chunk_sweep.py` to sweep your own corpus.
 
 ## Why this experiment exists
 

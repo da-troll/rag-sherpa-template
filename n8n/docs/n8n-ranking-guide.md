@@ -1,8 +1,18 @@
 # n8n RAG Ranking & Re-ranking Implementation Guide
 
+> **Schema note.** This guide uses an earlier flat-boolean schema for illustration (`has_trusted`, `has_primary_tag`). The current template uses a **typed-tags schema** documented in `CLAUDE.md`:
+>
+> | Old field (in examples below) | Current field (in the live workflow) |
+> | --- | --- |
+> | `has_primary_tag === true` | `(metadata.tags \|\| []).includes(PRIMARY_TAG)` |
+> | `has_trusted === true` | `((metadata.author_roles \|\| {}).trusted \|\| 0) > 0` |
+> | `trusted_count > 1` | `((metadata.author_roles \|\| {}).trusted \|\| 0) > 1` |
+>
+> The boost *patterns* shown below all carry over — only the field access changes. The live `Metadata Boost` code node in `n8n-workflow.json` already uses the current syntax; this guide is for adapting the patterns to other workflows you might build.
+
 ## Overview
 
-This guide shows how to implement metadata-based boosting and re-ranking in n8n workflows for your recruitment RAG bot. These approaches work **without external API dependencies** (Cohere, etc.) and overcome n8n's Pinecone node limitations.
+This guide shows how to implement metadata-based boosting and re-ranking in n8n workflows for your RAG bot. These approaches work **without external API dependencies** (Cohere, etc.) and overcome n8n's Pinecone node limitations.
 
 ### The Challenge
 
@@ -550,7 +560,7 @@ You might see n8n's native Cohere reranker node and think it's a good option. **
 
 Create these test queries to validate your boosting:
 
-1. **General question**: "How do I set up a recruitment job?"
+1. **General question**: "How do I set up a project?"
    - Should return mix of trusted + community content
    - Trusted sources boosted to top
 

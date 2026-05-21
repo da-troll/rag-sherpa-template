@@ -141,9 +141,19 @@ NOISE_PATTERNS = [
 # ===== HELPER FUNCTIONS =====
 
 def clean_title(title: str) -> str:
-    """Extract clean article title from full title string."""
-    title = re.sub(r'\s*:\s*<YOUR_COMPANY>\s*-\s*Customer Support Portal\s*$', '', title)
-    title = re.sub(r'^<YOUR_COMPANY> One\s*-\s*Recruitment\s*-\s*', '', title)
+    """Extract clean article title from full title string.
+
+    Tenant-specific cleaning: most help centers add boilerplate to page
+    titles (`Foo Product - Section Name - The real title : Support Portal`).
+    Add regexes here to strip whatever shape YOUR help center uses; the
+    default below leaves titles untouched.
+
+    Two example patterns are shown but commented out:
+    """
+    # Example: strip a ": <Company> - Customer Support Portal" suffix
+    # title = re.sub(r'\s*:\s*<YOUR_COMPANY>\s*-\s*Customer Support Portal\s*$', '', title)
+    # Example: strip a "<Product> One - <Section> - " prefix
+    # title = re.sub(r'^<YOUR_PRODUCT>\s*-\s*<YOUR_SECTION>\s*-\s*', '', title)
     return title.strip()
 
 def clean_text(text: str) -> str:

@@ -1,6 +1,17 @@
 # n8n Code Snippets for RAG Ranking
 
-Ready-to-use code templates for implementing metadata-based boosting in n8n Code nodes. All snippets are optimized for the recruitment RAG bot with `has_trusted` and `has_primary_tag` metadata.
+> **Schema note.** Snippets below illustrate boost patterns using an earlier flat-boolean schema (`has_trusted`, `has_primary_tag`). The current template emits typed `tags` (list) and `author_roles` (dict). The mapping for adapting these snippets:
+>
+> ```javascript
+> // OLD                                       // NEW
+> meta.has_primary_tag === true        →     (meta.tags || []).includes(PRIMARY_TAG)
+> meta.has_trusted === true            →     ((meta.author_roles || {}).trusted || 0) > 0
+> meta.trusted_count > 1               →     ((meta.author_roles || {}).trusted || 0) > 1
+> ```
+>
+> The live `Metadata Boost` node in `n8n-workflow.json` already uses the new syntax. The patterns below — hybrid scoring, parallel queries, debug filtering — all carry over directly; only the field access changes.
+
+Ready-to-use code templates for implementing metadata-based boosting in n8n Code nodes.
 
 ---
 

@@ -1,6 +1,8 @@
 # Experiment: Bot Self-Ingestion Drift
 
-> **Status:** _method written; results pending the experimental ingest run_
+> **Status:** complete on the corpus this template was built from. Result: bot filter is **load-bearing** (worth roughly +20 R@1, +0.113 MRR).
+>
+> **Re-run on your own corpus** if your bot has been live in the channel long enough to have answered ≥ ~50 questions. Until then, there's no contamination to measure. The methodology generalizes; the magnitude depends on how much your bot has been talking to itself.
 
 ## Why this experiment exists
 

@@ -1,15 +1,16 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repo. Human-readable docs live in `README.md`.
+Guidance for Claude Code when helping a user fork, customize, and extend this RAG bot template. Human-facing docs live in `README.md`.
 
 ## Project Overview
 
-RAG ingestion pipeline that pushes two content sources into a Pinecone index:
+This is a **starter template**. A user clones it, fills in placeholders in `.env`, customizes `prompts/persona.example.md`, points the ingest scripts at their own corpus, and gets a working RAG bot. Two source types ship by default — Slack threads and structured markdown articles — and both are configured for extension to additional sources.
 
-1. **Slack** — exported messages/threads from a your support channel
-2. **Help center articles** — scraped from your help center provider, cleaned, then converted to LlamaParse markdown
+The bot itself is an n8n workflow (`n8n/n8n-workflow.json`) that retrieves top-K from Pinecone, re-ranks with a JS Code node using tenant-defined metadata signals (typed tags + author roles), feeds the top 10 chunks to an LLM, and posts the answer back to Slack.
 
-Embeddings: OpenAI `text-embedding-3-small` (1536 dim). Vector store: Pinecone.
+Stack: OpenAI `text-embedding-3-small` (1536 dim) for embeddings, Pinecone for vector storage, n8n for the bot orchestration, LlamaParse for converting article screenshots to markdown (optional).
+
+The agent helping a user with this template should: (a) treat the template's defaults as illustrative, not authoritative — every tenant's corpus is different; (b) point the user at `eval/run_eval.py` whenever they ask whether a change "helped" — never tune retrieval on vibes; (c) push customization toward `.env` and `prompts/` rather than Python edits.
 
 ## Repo Layout
 
@@ -141,7 +142,7 @@ If `.env` contains zero `op://` references (user replaced them all with plain va
    - **`thread_synth`** (single vector): question (parent) + best 2 answers, prioritizing trusted users.
    - **Full thread chunks**: char-windowed conversation with overlap. With `CONTEXTUAL_RETRIEVAL=1`, each chunk gets a 1-2 sentence LLM-generated situating context prepended; synth vectors are not contextualized.
 
-   Each vector carries `has_primary_tag` (boolean) for n8n boost code — see Slack vector metadata schema below.
+   Each vector carries `tags` (list) and `author_roles` (dict) for n8n boost code — see Slack vector metadata schema below.
 
 ### Help center articles pipeline
 
@@ -180,25 +181,29 @@ Applied to: all article chunks; full-thread Slack chunks. **Not** applied to Sla
   "message_count": 5,
   "chunk_index": 0,
   "chunk_strategy": "chars1500_overlap300",
-  "has_trusted": true,
   "has_answer_like": true,
-  "has_primary_tag": true,
-  "trusted_repliers": ["U0000000001"],
-  "trusted_count": 1,
+  "tags": ["verified"],
+  "author_roles": {"trusted": 1},
+  "author_role_ids": {"trusted": ["U0000000001"]},
   "text": "<chunk>",
   "doc_type": "thread_synth",
   "synth": true
 }
 ```
 
+**Schema notes:**
+- `tags` is a **list of curation tag names** (configured via `PRIMARY_REACTION_TAG`, default `"verified"`). A future tenant adding `:bug:`, `:howto:`, etc. just appends to this list — no schema change.
+- `author_roles` is a **dict of role → count** (e.g. `{"trusted": 2}`). A tenant adding `"on_call"`, `"lead"`, etc. extends `ROLE_DEFINITIONS` in `ingest/slack-to-pc.py` — no schema change.
+- `author_role_ids` carries the actual Slack IDs per role for citation-time use (e.g. "answered by an on-call engineer").
+
 **Slack ingest filtering and signals:**
-- Parents whose `subtype` is in `{channel_join, channel_leave, channel_name, channel_topic, channel_purpose, channel_archive, channel_unarchive, thread_broadcast}` are dropped before any vector is built — these system events used to pollute retrieval with embeddings of strings like `"<@U0000000001> has joined the channel"`.
-- **Bot/app messages are filtered out of every reply list** (predicate: `bot_id` set, `app_id` set, or `subtype == "bot_message"`). The RAG Bot bot itself answers in this channel, so without the filter its own answers — generated *from* the index — would be re-embedded and re-indexed, creating a closed-loop feedback amplifier. On the current corpus this drops 347+ replies authored by the bot.
-- `has_primary_tag` (boolean) — true if the parent or any reply has the `:verified:` reaction. This is the **only** quality signal surfaced in metadata at ingest time. Rationale:
-  - `:verified:` is a deliberate curation tag applied by the SME owner to mark threads as verified content for RAG. Its presence is the verified-content signal.
-  - Multiplicity is NOT signal: additional `:verified:` reactions on the same thread are typically other team members echoing the SME's tag — they don't add verification beyond the first. So presence-or-not, not count.
-  - Other reactions (`:+1:`, `:raised_hands:`, `:rocket:`, etc.) are explicitly NOT counted as quality signals. They fire ambiguously on launch announcements, sympathy, agreement, and "thanks" — corrupting any signal they'd contribute. Popularity is not relevance.
-  - n8n boost code is the right place to apply weight: multiply scores by a constant when `has_primary_tag == true`.
+- Parents whose `subtype` is in `{channel_join, channel_leave, channel_name, channel_topic, channel_purpose, channel_archive, channel_unarchive, thread_broadcast}` are dropped before any vector is built — these system events would pollute retrieval with garbage like `"<@U0000000001> has joined the channel"`.
+- **Bot/app messages are filtered out of every reply list** (predicate: `bot_id` set, `app_id` set, or `subtype == "bot_message"`). The bot itself answers in the channel, so without the filter its own answers — generated *from* the index — would be re-embedded and re-indexed, creating a closed-loop feedback amplifier (worth ~+20 R@1 / +0.113 MRR on the corpus this template was built from; see `experiments/bot-self-ingestion-drift.md`).
+- `tags` (list) carries the configured primary curation tag when set. This is the **only** curation signal surfaced in metadata at ingest time. Rationale:
+  - The configured tag (e.g. `:verified:`) is a deliberate curation reaction. Its presence is the verified-content signal.
+  - Multiplicity is NOT signal: additional reactions of the same name are typically other team members echoing the curator — they don't add verification.
+  - Other reactions (`:+1:`, `:raised_hands:`, `:rocket:`, etc.) are NOT counted. They fire ambiguously on launch announcements, sympathy, and "thanks" — corrupting any signal they'd contribute. Popularity is not relevance.
+  - The n8n Metadata Boost code applies weight: `score *= W_PRIMARY_TAG` when `tags` contains the primary tag.
 
 ### Help center vectors
 
@@ -223,11 +228,11 @@ Applied to: all article chunks; full-thread Slack chunks. **Not** applied to Sla
 
 ## Trusted User System
 
-`TRUSTED_USERS` env var lists SME Slack IDs. Their replies are prioritized in synthetic thread summaries. `has_trusted`, `trusted_repliers`, and `trusted_count` are emitted in metadata for downstream boosting.
+`TRUSTED_USERS` env var lists SME Slack IDs. Their replies are prioritized in synthetic thread summaries. The metadata fields `author_roles.trusted` (count) and `author_role_ids.trusted` (list of IDs) are emitted for downstream boosting. To add more roles (e.g. on-call, lead), extend `ROLE_DEFINITIONS` in `ingest/slack-to-pc.py` — the same dict-keyed shape covers any number of roles.
 
 ## Primary Tag Tracking
 
-`has_primary_tag` is true when the parent or any reply has a `:verified:` reaction. Reaction strings are also embedded in the chunk text (e.g., `:verified:x3`).
+`tags` contains the primary curation tag name (configured via `PRIMARY_REACTION_TAG`, default `"verified"`) when the parent or any reply carries that reaction. Reaction strings are also embedded in the chunk text (e.g., `:verified:x3`).
 
 ## n8n Retrieval
 
@@ -239,7 +244,7 @@ The exported workflow lives at `n8n/n8n-workflow.json`. It is **not** a Vector S
   → [top 10 chunks] → [RAG Bot agent] → [Send thread reply]
 ```
 
-The **Metadata Boost** node returns a single item with a `chunks` array (not 10 items) — emitting 10 items caused the agent to run 10× and broke `.item` pairing. Downstream nodes reference it via `.first()`, not `.item`. Boost code keys on `has_primary_tag` (×1.40), `has_trusted` (×1.30), plus smaller multipliers for `has_images`, `synth`, and multi-SME threads.
+The **Metadata Boost** node returns a single item with a `chunks` array (not 10 items) — emitting 10 items causes the agent to run 10× and breaks `.item` pairing. Downstream nodes reference it via `.first()`, not `.item`. Boost code keys on `tags` containing the primary tag (×1.40), `author_roles.trusted > 0` (×1.30), `author_roles.trusted > 1` (×1.05 multi-trusted), `synth`/`thread_synth` (×1.10), and `has_images` (×1.05). All weights are configurable at the top of the JS — tune them against your own corpus with `eval/run_eval.py`.
 
 See:
 - `n8n/docs/n8n-ranking-guide.md` — full implementation guide (why code-boost, not Cohere)

@@ -36,6 +36,15 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", "64"))
 # ~15-20% overlap. See `p90-calc.py` to re-derive after corpus shape shifts.
 CHUNK_CHARS   = int(os.getenv("SLACK_CHUNK_CHARS", "1500"))
 CHUNK_OVERLAP = int(os.getenv("SLACK_CHUNK_OVERLAP", "300"))
+
+# The single curation reaction whose presence on a thread marks it as
+# verified content. Tenant chooses what tag means "this is the canonical
+# answer" in their channel — common choices: "verified", "answered",
+# "approved". Stored as a value in `metadata.tags`, not as a field named
+# after the value, so adding a second curation tag later doesn't need
+# schema changes.
+PRIMARY_REACTION_TAG = os.getenv("PRIMARY_REACTION_TAG", "verified").lower()
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
@@ -89,6 +98,17 @@ def _parse_trusted(env_val: str):
 
 TRUSTED = _parse_trusted(os.getenv("TRUSTED_USERS"))
 
+# Author-role definitions. The schema below carries role membership as
+# a dict — role name → set of Slack IDs — so a tenant can add additional
+# roles (e.g. "on_call", "lead", "escalation") without code changes,
+# only by extending this dict. Today only "trusted" is defined.
+#
+# To add a role, parse another env var and add it here:
+#     ROLE_DEFINITIONS["on_call"] = _parse_trusted(os.getenv("ON_CALL_USERS"))
+ROLE_DEFINITIONS: Dict[str, set] = {
+    "trusted": TRUSTED,
+}
+
 # ---------- helpers ----------
 def ts_to_iso(ts: str) -> str:
     try:
@@ -104,15 +124,16 @@ def is_parent(msg: Dict[str, Any]) -> bool:
     return (msg.get("thread_ts") or ts) == ts
 
 def parent_has_primary_tag(msg: Dict[str, Any]) -> bool:
+    """True if the parent message carries the configured primary reaction tag."""
     for r in (msg.get("reactions") or []):
-        if (r.get("name") or "").lower() == "recruitment":
+        if _reaction_base_name(r.get("name")) == PRIMARY_REACTION_TAG:
             return True
     return False
 
 def has_primary_tag(msg: Dict[str, Any]) -> bool:
-    """Check if a message has the :verified: reaction"""
+    """True if a message (parent or reply) carries the primary reaction tag."""
     for r in (msg.get("reactions") or []):
-        if (r.get("name") or "").lower() == "recruitment":
+        if _reaction_base_name(r.get("name")) == PRIMARY_REACTION_TAG:
             return True
     return False
 
@@ -160,7 +181,7 @@ def is_bot_message(msg: Dict[str, Any]) -> bool:
     Bot messages are filtered out at ingest time so they can't be re-embedded
     as authoritative answers — they were generated FROM the index, and feeding
     them back risks closed-loop drift. Currently filters 347+ of RAG Bot's own
-    replies in the recruitment channel.
+    replies in your channel.
 
     When the experimental SLACK_INCLUDE_BOTS=1 env var is set, this function
     always returns False (filter OFF) — the bot replies pass through into the
@@ -234,9 +255,16 @@ def build_thread_doc(parent: Dict[str, Any], replies: List[Dict[str, Any]]) -> D
     ts_first = min(all_ts, key=lambda x: float(x))
     ts_last  = max(all_ts, key=lambda x: float(x))
 
-    # Calculate trusted repliers and count
-    trusted_repliers = [r.get("user") for r in replies if r.get("user") in TRUSTED]
-    trusted_count = len(trusted_repliers)
+    # Per-role membership across the thread. `author_roles` is the count,
+    # `author_role_ids` is the actual IDs. Both keyed by role name. See
+    # ROLE_DEFINITIONS at the top of this file.
+    author_roles: Dict[str, int] = {}
+    author_role_ids: Dict[str, List[str]] = {}
+    for role_name, role_set in ROLE_DEFINITIONS.items():
+        ids_in_role = sorted([a for a in authors if a in role_set])
+        if ids_in_role:
+            author_roles[role_name] = len(ids_in_role)
+            author_role_ids[role_name] = ids_in_role
 
     return {
         "text": text,
@@ -244,8 +272,8 @@ def build_thread_doc(parent: Dict[str, Any], replies: List[Dict[str, Any]]) -> D
         "ts_first": ts_first,
         "ts_last": ts_last,
         "message_count": 1 + len(replies),
-        "trusted_repliers": trusted_repliers,
-        "trusted_count": trusted_count,
+        "author_roles": author_roles,
+        "author_role_ids": author_role_ids,
     }
 
 def chunk_text(s: str, max_chars=CHUNK_CHARS, overlap=CHUNK_OVERLAP):
@@ -342,8 +370,8 @@ def main():
     pairs = collect_parent_threads(messages)
     parents_total = len(pairs)
     kept_replies = sum(len(r) for _, r in pairs)
-    parents_with_recruitment = sum(1 for p, _ in pairs if parent_has_primary_tag(p))
-    threads_with_recruitment = sum(
+    parents_with_primary_tag = sum(1 for p, _ in pairs if parent_has_primary_tag(p))
+    threads_with_primary_tag = sum(
         1 for p, r in pairs
         if has_primary_tag(p) or any(has_primary_tag(x) for x in r)
     )
@@ -373,8 +401,8 @@ def main():
     print(f"  {DIM}replies{RESET}     {BOLD}{kept_replies}{RESET} human "
           f"{DIM}(dropped {bot_replies_total} bot-authored from {raw_replies} total){RESET}")
     print(f"  {DIM}signals{RESET}     "
-          f":verified: on parent {BOLD}{parents_with_recruitment}{RESET}  ·  "
-          f"anywhere in thread {BOLD}{threads_with_recruitment}{RESET}")
+          f":{PRIMARY_REACTION_TAG}: on parent {BOLD}{parents_with_primary_tag}{RESET}  ·  "
+          f"anywhere in thread {BOLD}{threads_with_primary_tag}{RESET}")
     print()
 
     # select all threads (no reaction-based filtering)
@@ -409,17 +437,14 @@ def main():
 
         # per-message features (for boosts and grouping later)
         per_msg = [add_line_meta(p, 0)] + [add_line_meta(r, i+1) for i, r in enumerate(replies)]
-        thread_has_trusted = any(x["author_trusted"] for x in per_msg)
-        thread_has_answer  = any(x["answer_like"] for x in per_msg)
+        thread_has_answer = any(x["answer_like"] for x in per_msg)
 
-        # Check if parent or any reply has :verified: reaction
-        thread_has_primary_tag = has_primary_tag(p) or any(
-            has_primary_tag(r) for r in replies
-        )
-
-        # Quality signal: `has_primary_tag` (boolean) is computed
-        # below in `base_meta` from `parent_has_primary_tag(p) or any(...)`.
-        # It's the ONLY curation signal we surface — presence not count.
+        # Curation signal: typed `tags` list rather than a boolean field named
+        # after the tag. Adding a second tag later (e.g. ":bug:" routing) is a
+        # config change, not a schema change.
+        thread_tags: List[str] = []
+        if has_primary_tag(p) or any(has_primary_tag(r) for r in replies):
+            thread_tags.append(PRIMARY_REACTION_TAG)
 
         base_meta = {
             "source": "slack",
@@ -431,11 +456,10 @@ def main():
             "ts_last": ts_to_iso(doc["ts_last"]),
             "message_count": doc["message_count"],
             "chunk_strategy": f"chars{CHUNK_CHARS}_overlap{CHUNK_OVERLAP}",
-            "has_trusted": thread_has_trusted,
             "has_answer_like": thread_has_answer,
-            "has_primary_tag": thread_has_primary_tag,
-            "trusted_repliers": doc.get("trusted_repliers", []),
-            "trusted_count": doc.get("trusted_count", 0),
+            "tags": thread_tags,
+            "author_roles": doc.get("author_roles", {}),
+            "author_role_ids": doc.get("author_role_ids", {}),
         }
 
             # --- synthetic thread doc (Q + best answers) ---
@@ -533,7 +557,7 @@ def main():
         # both produce the same width. The `:verified:` chip is intentionally
         # not displayed — the boolean lives in metadata for n8n boost code, but
         # adding it inline made the terminal layout noisy and inconsistent.
-        _tc = base_meta['trusted_count']
+        _tc = base_meta.get('author_roles', {}).get('trusted', 0)
         _trust_chip = f"{GREEN}trust={_tc}{RESET}" if _tc else f"{DIM}trust=0{RESET}"
         print(f"  {GREEN}{CHECK}{RESET} {BOLD}{thread_chunk_count:>2}{RESET} chunks "
               f"{DIM}+{RESET} {BOLD}1{RESET} synth  {DIM}|{RESET}  "

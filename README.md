@@ -11,6 +11,68 @@ The bot itself runs in n8n: retrieve top-K from Pinecone, re-rank with a small J
 
 ---
 
+## Project structure
+
+```
+slack-rag-bot-template/
+├── README.md                  # This file — human-facing template guide
+├── CLAUDE.md                  # LLM-agent-oriented version of the same spec
+├── LICENSE                    # MIT
+├── .env.example               # Committed seed: op:// refs + sensible plain defaults
+├── run                        # Wrapper: `op run --env-file=.env -- "$@"`
+├── requirements.txt
+│
+├── contextual_retrieval.py    # Anthropic-style chunk-context helper (shared by ingest)
+├── styling.py                 # Terminal banner/section/summary helpers (shared)
+│
+├── ingest/                    # All scripts that write to Pinecone or transform data
+│   ├── fetch-all-messages.py  # Slack step 1 — API pull → data/slack/slack_<ID>.json
+│   ├── slack-to-pc.py         # Slack step 3 — embed + upsert (+ --namespace, --include-bots)
+│   ├── scrape-articles.py     # Articles step 0 — live help-center crawl
+│   ├── clean-articles-json.py # Articles step 1 — strip noise patterns
+│   ├── articles-to-markdown.py# Articles step 2 — LlamaParse (costs credits)
+│   └── articles-to-pc.py      # Articles step 4 — header-aware chunk + upsert (+ --namespace)
+│
+├── diagnostics/               # Read-only inspections — print stats, don't mutate
+│   ├── p90-calc-slack.py      # Slack thread length percentiles
+│   └── p90-calc-articles.py   # Article + H2/H3 section size percentiles
+│
+├── data/                      # Your corpus lands here (contents gitignored;
+│   ├── slack/                 #  ships with empty dirs + sample article JSON
+│   └── articles/              #  for the smoke test)
+│
+├── eval/                      # Retrieval-quality harness — measure changes, don't guess
+│   ├── run_eval.py            # Recall@K + MRR against questions.json
+│   ├── questions.json         # 3 starter synthetic questions (REPLACE with your own)
+│   ├── HOW_TO_LABEL.md        # Guide to building your own question set
+│   ├── README.md              # How to run, interpret, extend
+│   └── results/sample.json    # Example output format (other runs are gitignored)
+│
+├── experiments/               # Reproducible experiments + their write-ups
+│   ├── article_chunk_sweep.py        # Sweep harness: re-ingest at N caps, re-eval
+│   ├── article-chunk-cap-sweep.md    # Methodology + finding from the original corpus
+│   └── bot-self-ingestion-drift.md   # Bot-filter A/B that proved the filter is load-bearing
+│
+├── prompts/                   # Modular system-prompt parts (concat → n8n agent node)
+│   ├── persona.example.md           # Bot name, scope, voice — TENANT-OWNED
+│   ├── citation-format.md           # Generic citation pattern
+│   ├── source-descriptions/
+│   │   ├── slack.md                 # How Slack vectors look + how to cite
+│   │   └── articles.md              # How article vectors look + how to cite
+│   └── README.md                    # Concat order + dynamic-loading option
+│
+└── n8n/                       # Bot workflow + import guide + integration docs
+    ├── n8n-workflow.json            # Exported workflow (import into n8n)
+    ├── README-import.md             # 10-step setup guide for a fresh n8n instance
+    └── docs/
+        ├── n8n-ranking-guide.md     # Code-boost vs. Cohere; full implementation
+        └── n8n-code-snippets.md     # Boost, RRF, debug — ready to paste
+```
+
+All scripts in `ingest/`, `diagnostics/`, and `experiments/` inject the repo root into `sys.path` at startup so `contextual_retrieval` and `styling` resolve as top-level imports.
+
+---
+
 ## Make this your own
 
 Five edits get you from a fresh clone to a working bot:
@@ -280,20 +342,7 @@ The char cap (`ARTICLE_CHUNK_CHARS`) only kicks in for unusually long sections, 
 
 ---
 
-## What's in `archive/`?
-
-Past iterations of this pipeline. Nothing here is run by the current scripts, but the files are kept for reference rather than deleted:
-
-| File / folder                          | What it was                                                       |
-| -------------------------------------- | ----------------------------------------------------------------- |
-| `archive/pc-init.py`                   | Tiny "is Pinecone reachable?" stub. Now reads from `.env`.        |
-| `archive/articles/chunk_plan.json`     | The old adaptive-chunking config (standard vs long_doc).          |
-| `archive/articles-txt/*.txt`           | Pre-LlamaParse raw article exports — superseded by markdown JSON. |
-| `archive/message-fetches/*.json`       | A stale Slack export staging copy.                                |
-
----
-
-## n8n / RAG Bot bot
+## n8n / RAG Bot
 
 The bot itself lives in n8n; the exported workflow is `n8n/n8n-workflow.json`. It's **not** a Vector Store Tool agent — it's an explicit retrieval pipeline so a small JavaScript Code node can boost results between Pinecone and the LLM:
 
@@ -310,63 +359,3 @@ Implementation notes and copy-paste snippets:
 - `n8n/docs/n8n-ranking-guide.md` — full guide, including why we don't use Cohere
 - `n8n/docs/n8n-code-snippets.md` — ready-to-paste JS for the Code node
 
----
-
-## Project structure
-
-```
-slack-rag-bot-template/
-├── README.md                  # This file — human-facing template guide
-├── CLAUDE.md                  # LLM-agent-oriented version of the same spec
-├── .env.example               # Committed seed: op:// refs + sensible plain defaults
-├── run                        # Wrapper: `op run --env-file=.env -- "$@"`
-├── requirements.txt
-│
-├── contextual_retrieval.py    # Anthropic-style chunk-context helper (shared by ingest)
-├── styling.py                 # Terminal banner/section/summary helpers (shared)
-│
-├── ingest/                    # All scripts that write to Pinecone or transform data
-│   ├── fetch-all-messages.py  # Slack step 1 — API pull → data/slack/slack_<ID>.json
-│   ├── slack-to-pc.py         # Slack step 3 — embed + upsert (+ --namespace, --include-bots)
-│   ├── scrape-articles.py     # Articles step 0 — live help-center crawl
-│   ├── clean-articles-json.py # Articles step 1 — strip noise patterns
-│   ├── articles-to-markdown.py# Articles step 2 — LlamaParse (costs credits)
-│   └── articles-to-pc.py      # Articles step 4 — header-aware chunk + upsert (+ --namespace)
-│
-├── diagnostics/               # Read-only inspections — print stats, don't mutate
-│   ├── p90-calc-slack.py      # Slack thread length percentiles
-│   └── p90-calc-articles.py   # Article + H2/H3 section size percentiles
-│
-├── data/                      # Your corpus lands here (contents gitignored;
-│   ├── slack/                 #  ships with empty dirs + sample article JSON
-│   └── articles/              #  for the smoke test)
-│
-├── eval/                      # Retrieval-quality harness — measure changes, don't guess
-│   ├── run_eval.py            # Recall@K + MRR against questions.json
-│   ├── questions.json         # 3 starter synthetic questions (REPLACE with your own)
-│   ├── HOW_TO_LABEL.md        # Guide to building your own question set
-│   ├── README.md              # How to run, interpret, extend
-│   └── results/sample.json    # Example output format (other runs are gitignored)
-│
-├── experiments/               # Reproducible experiments + their write-ups
-│   ├── article_chunk_sweep.py        # Sweep harness: re-ingest at N caps, re-eval
-│   ├── article-chunk-cap-sweep.md    # Methodology + finding from the original corpus
-│   └── bot-self-ingestion-drift.md   # Bot-filter A/B that proved the filter is load-bearing
-│
-├── prompts/                   # Modular system-prompt parts (concat → n8n agent node)
-│   ├── persona.example.md           # Bot name, scope, voice — TENANT-OWNED
-│   ├── citation-format.md           # Generic citation pattern
-│   ├── source-descriptions/
-│   │   ├── slack.md                 # How Slack vectors look + how to cite
-│   │   └── articles.md              # How article vectors look + how to cite
-│   └── README.md                    # Concat order + dynamic-loading option
-│
-└── n8n/                       # Bot workflow + import guide + integration docs
-    ├── n8n-workflow.json            # Exported workflow (import into n8n)
-    ├── README-import.md             # 10-step setup guide for a fresh n8n instance
-    └── docs/
-        ├── n8n-ranking-guide.md     # Code-boost vs. Cohere; full implementation
-        └── n8n-code-snippets.md     # Boost, RRF, debug — ready to paste
-```
-
-All scripts in `ingest/`, `diagnostics/`, and `experiments/` inject the repo root into `sys.path` at startup so `contextual_retrieval` and `styling` resolve as top-level imports.

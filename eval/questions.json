@@ -1,162 +1,26 @@
 [
   {
     "id": "q001",
-    "question": "How do I get started with Simployer Recruitment?",
+    "question": "How do I create my first widget?",
     "match": {
       "doc_id": "hc::getting_started::cd7374caba86"
     },
-    "notes": "starter / overview article"
+    "notes": "Onboarding question \u2014 answered by the 'Creating your first widget' section."
   },
   {
     "id": "q002",
-    "question": "How can I bulk import candidates?",
+    "question": "How do I organize widgets into categories?",
     "match": {
-      "doc_id": "hc::importing_candidates::0381c1c025c3"
+      "doc_id": "hc::widget_categories::a45fbf0c8b68"
     },
-    "notes": "import flow"
+    "notes": "Organization \u2014 answered by 'Assigning a widget to a category'."
   },
   {
     "id": "q003",
-    "question": "Where do I upload our company logo?",
+    "question": "Can I share a widget with people outside my workspace?",
     "match": {
-      "doc_id": "hc::customise_your_company_branding::626f811af2cf"
+      "doc_id": "hc::team_sharing::829d3987343b"
     },
-    "notes": "branding"
-  },
-  {
-    "id": "q004",
-    "question": "How do I connect Slack for recruitment notifications?",
-    "match": {
-      "doc_id": "hc::integrations_slack::0f4b5e45954e"
-    },
-    "notes": "slack integration"
-  },
-  {
-    "id": "q005",
-    "question": "How do I set up Cronofy for interview scheduling?",
-    "match": {
-      "doc_id": "hc::connecting_cronofy_to_recruitment::082ab3a9da69"
-    },
-    "notes": "cronofy"
-  },
-  {
-    "id": "q006",
-    "question": "Where do I integrate job boards?",
-    "match": {
-      "doc_id": "hc::integrating_job_boards::f2818e4a9f96"
-    },
-    "notes": "job boards"
-  },
-  {
-    "id": "q007",
-    "question": "How do I post a job to LinkedIn?",
-    "match": {
-      "doc_id": "hc::linkedin::7728240c80b6"
-    },
-    "notes": "linkedin"
-  },
-  {
-    "id": "q008",
-    "question": "How do I post jobs to Indeed?",
-    "match": {
-      "doc_id": "hc::post_jobs_to_indeed::388817171c53"
-    },
-    "notes": "indeed"
-  },
-  {
-    "id": "q009",
-    "question": "Is there a recruitment app for Microsoft Teams?",
-    "match": {
-      "doc_id": "hc::simployer_recruitment_apps_for_microsoft_teams_and_email_access::f95e02d2770c"
-    },
-    "notes": "teams app"
-  },
-  {
-    "id": "q010",
-    "question": "How do candidates accept the privacy policy?",
-    "match": {
-      "doc_id": "hc::candidate_privacy_policy::997fa68aa4ad"
-    },
-    "notes": "privacy / GDPR"
-  },
-  {
-    "id": "q011",
-    "question": "How do I set my availability for interviews?",
-    "match": {
-      "doc_id": "hc::setting_your_availability_for_interviews::5b3dc3add768"
-    },
-    "notes": "interview availability"
-  },
-  {
-    "id": "q012",
-    "question": "How do I connect my email so I can send candidates messages?",
-    "match": {
-      "doc_id": "hc::email::a88b7dcd1a9e"
-    },
-    "notes": "email integration"
-  },
-  {
-    "id": "q013",
-    "question": "How do I customize notification settings?",
-    "match": {
-      "doc_id": "hc::customise_notifications::67f8ae97fc12"
-    },
-    "notes": "notifications"
-  },
-  {
-    "id": "q014",
-    "question": "How do I build my career page?",
-    "match": {
-      "doc_id": "hc::creating_your_career_page::abd51c102674"
-    },
-    "notes": "career site"
-  },
-  {
-    "id": "q015",
-    "question": "What permission levels exist for users?",
-    "match": {
-      "doc_id": "hc::user_roles::8174eb356671"
-    },
-    "notes": "user roles"
-  },
-  {
-    "id": "q016",
-    "question": "Walk me through setting up a new job posting.",
-    "match": {
-      "doc_id": "hc::setting_up_a_job::7d70c7bc94ca"
-    },
-    "notes": "job creation"
-  },
-  {
-    "id": "q017",
-    "question": "Why are my Indeed jobs not showing up?",
-    "match": {
-      "doc_id": "hc::post_jobs_to_indeed::388817171c53"
-    },
-    "notes": "lexical mismatch — 'showing up' not in article body; tests semantic recall"
-  },
-  {
-    "id": "q018",
-    "question": "Can I limit who can see candidate data?",
-    "match": {
-      "doc_id": "hc::user_roles::8174eb356671"
-    },
-    "notes": "lexical mismatch — phrased as access control"
-  },
-  {
-    "id": "q019",
-    "question": "How do I use Outlook with Recruitment?",
-    "match": {
-      "doc_id": "hc::email::a88b7dcd1a9e"
-    },
-    "notes": "specific tool name not in body"
-  },
-  {
-    "id": "q020",
-    "question": "What's the workflow for inviting interview slots to candidates?",
-    "match": {
-      "doc_id": "hc::connecting_cronofy_to_recruitment::082ab3a9da69"
-    },
-    "notes": "describes feature without naming Cronofy"
+    "notes": "Access control \u2014 answered by 'Sharing with external users'."
   }
 ]

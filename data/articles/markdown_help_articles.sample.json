@@ -1,0 +1,71 @@
+{
+  "getting_started": {
+    "metadata": {
+      "source": "helpcenter",
+      "url": "https://example.com/docs/getting_started",
+      "title": "Getting started with Widget Manager",
+      "description": "",
+      "keywords": [
+        "Getting started with Widget Manager"
+      ],
+      "word_count": 230,
+      "char_count": 1423,
+      "reading_time_minutes": 1,
+      "image_count": 0,
+      "has_images": false,
+      "format": "markdown_with_llamaparse",
+      "original_extracted_at": "",
+      "markdown_converted_at": "2026-05-21T00:00:00.000000Z"
+    },
+    "content": {
+      "markdown": "\n# Getting started with Widget Manager\n\nWelcome to Widget Manager. This guide walks you through creating your first widget and getting comfortable with the workspace.\n\n## Creating your first widget\n\nTo create a widget, click the **+ New widget** button in the top-right of the dashboard. You'll be asked to choose a widget type \u2014 start with **Basic** for a generic, configurable widget. Give your widget a name (between 3 and 60 characters) and an optional description.\n\nOnce created, the widget appears in your dashboard and is editable immediately. Drafts auto-save every 10 seconds; you don't need to publish to keep your work.\n\n## Publishing a widget\n\nWhen your widget is ready, click **Publish** in the top-right. Published widgets are visible to anyone in your workspace with view access. Drafts are private to you until published.\n\nYou can unpublish any widget at any time by clicking **Unpublish** from the same menu. Unpublishing immediately removes the widget from the workspace view but preserves all its content.\n\n## Workspace and dashboard\n\nYour workspace is the top-level container for all your widgets. Inside the workspace, the dashboard shows your widgets organized by category (see *Managing widget categories* for how to set those up). Each widget tile shows its name, last-edit time, and a small preview.\n\nUse the search bar at the top of the dashboard to find widgets by name, description, or content.\n",
+      "format": "markdown"
+    }
+  },
+  "widget_categories": {
+    "metadata": {
+      "source": "helpcenter",
+      "url": "https://example.com/docs/widget_categories",
+      "title": "Managing widget categories",
+      "description": "",
+      "keywords": [
+        "Managing widget categories"
+      ],
+      "word_count": 184,
+      "char_count": 1156,
+      "reading_time_minutes": 1,
+      "image_count": 0,
+      "has_images": false,
+      "format": "markdown_with_llamaparse",
+      "original_extracted_at": "",
+      "markdown_converted_at": "2026-05-21T00:00:00.000000Z"
+    },
+    "content": {
+      "markdown": "\n# Managing widget categories\n\nCategories let you organize widgets into logical groups. Every widget belongs to exactly one category.\n\n## Creating a category\n\nTo create a category, go to **Settings \u2192 Categories** and click **+ New category**. Each category needs a name (max 40 characters) and an optional color label. Colors are purely visual and don't affect filtering or permissions.\n\nYou can create up to 50 categories per workspace.\n\n## Assigning a widget to a category\n\nYou can assign a category when creating a widget, or change it later by editing the widget and selecting a new category from the dropdown at the top. Widgets without a category land in the default **Uncategorized** bucket.\n\n## Reordering categories\n\nCategories appear on the dashboard in the order you set under **Settings \u2192 Categories**. Drag-and-drop reordering is supported. The default category (**Uncategorized**) is always pinned to the bottom and cannot be moved.\n\n## Deleting a category\n\nDeleting a category does not delete its widgets \u2014 they're moved to **Uncategorized**. You'll be asked to confirm before deletion. If you want to delete the widgets too, do that first.\n",
+      "format": "markdown"
+    }
+  },
+  "team_sharing": {
+    "metadata": {
+      "source": "helpcenter",
+      "url": "https://example.com/docs/team_sharing",
+      "title": "Sharing widgets with your team",
+      "description": "",
+      "keywords": [
+        "Sharing widgets with your team"
+      ],
+      "word_count": 192,
+      "char_count": 1198,
+      "reading_time_minutes": 1,
+      "image_count": 0,
+      "has_images": false,
+      "format": "markdown_with_llamaparse",
+      "original_extracted_at": "",
+      "markdown_converted_at": "2026-05-21T00:00:00.000000Z"
+    },
+    "content": {
+      "markdown": "\n# Sharing widgets with your team\n\nWidget Manager supports two sharing modes: **workspace-wide** (every workspace member can see the widget) and **explicit sharing** (only listed users).\n\n## Sharing with the whole workspace\n\nThe default for a published widget is workspace-wide visibility. Anyone in your workspace can find, view, and search the widget. Only the widget owner (and workspace admins) can edit it.\n\nTo change a widget from workspace-wide to explicit sharing, open the widget and go to **Share \u2192 Visibility \u2192 Specific people**.\n\n## Explicit sharing\n\nIn **Specific people** mode, you add users one at a time. Each user can be granted **View**, **Comment**, or **Edit** permission. Permissions are widget-level: a user who can edit one widget can't necessarily edit another.\n\nAdding a user sends them a notification. You can revoke access at any time from the same Share panel.\n\n## Sharing with external users\n\nExternal users (people outside your workspace) can be invited via email through **Share \u2192 Invite external**. They receive a link valid for 7 days. External users can only view, never edit, even if you grant Edit permission \u2014 that's a hard product limit and cannot be changed.\n",
+      "format": "markdown"
+    }
+  }
+}

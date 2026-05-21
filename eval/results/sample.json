@@ -1,0 +1,41 @@
+{
+  "namespace": "template-smoke",
+  "model": "text-embedding-3-small",
+  "questions_n": 3,
+  "recall_at": {
+    "1": 2,
+    "3": 3,
+    "5": 3,
+    "10": 3
+  },
+  "mrr": 0.833,
+  "questions": [
+    {
+      "id": "q001",
+      "question": "How do I create my first widget?",
+      "expected_doc_id": "hc::getting_started::cd7374caba86",
+      "results_top_5": [
+        {
+          "doc_id": "hc::getting_started::cd7374caba86",
+          "score": 0.81,
+          "chunk_index": 0,
+          "rank": 1
+        },
+        {
+          "doc_id": "hc::widget_categories::a45fbf0c8b68",
+          "score": 0.41,
+          "chunk_index": 0,
+          "rank": 2
+        },
+        {
+          "doc_id": "hc::team_sharing::829d3987343b",
+          "score": 0.39,
+          "chunk_index": 1,
+          "rank": 3
+        }
+      ],
+      "rank_of_match": 1
+    }
+  ],
+  "note": "This is an example output. Real runs by `eval/run_eval.py` produce more entries and tend to have score distributions shaped by your corpus."
+}

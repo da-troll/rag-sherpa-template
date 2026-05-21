@@ -35,10 +35,12 @@ archive/
 
 # Slack exports — contain real user IDs and message content, large, regenerable
 # via ingest/fetch-all-messages.py. Pattern matches both old (repo-root) and
-# new (data/slack/) locations.
+# new (data/slack/) locations. We ignore CONTENTS (not the dir itself) so the
+# .gitkeep exception below keeps the dir alive in version control.
 slack_*.json
 slack_*.csv
-data/slack/
+data/slack/*
+!data/slack/.gitkeep
 message-fetches/
 
 # Throwaway smoke tests / one-shot scripts (e.g. _genericize.py, _wipe_namespace.py)
@@ -51,8 +53,10 @@ _*.txt
 RAG_IMPROVEMENTS_PLAN.md
 GENERICIZATION_PLAN.md
 
-# Eval results (regenerable; per-run retrieval scores aren't useful in git history)
-eval/results/
+# Eval results (regenerable; per-run retrieval scores aren't useful in git history).
+# Ignore CONTENTS (not the dir itself) so sample.json can be re-included.
+eval/results/*
+!eval/results/sample.json
 
 # Scraper per-URL HTML cache (regenerable; large)
 data/articles/.cache/

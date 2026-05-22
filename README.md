@@ -9,7 +9,7 @@
                           A N S W E R   A N Y T H I N G
 ```
 
-# Multi-source Slack RAG bot template
+# Multi-source RAG Slack bot template
 
 A starter template for building a domain Q&A bot that ingests one or more text-based content sources into Pinecone and serves answers via an n8n workflow. Two source types ship by default:
 

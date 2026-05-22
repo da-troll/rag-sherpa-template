@@ -61,9 +61,10 @@ rag-sherpa-template/
 │   │   └── articles.md              # How article vectors look + how to cite
 │   └── README.md                    # Concat order + dynamic-loading option
 │
-└── n8n/                       # Bot workflow + import guide + integration docs
+└── n8n/                       # Bot workflow + Slack app + integration docs
     ├── n8n-workflow.json            # Exported workflow (import into n8n)
-    ├── README-import.md             # 10-step setup guide for a fresh n8n instance
+    ├── slack-app-manifest.json      # Pasteable Slack app manifest (minimum scopes)
+    ├── README-import.md             # End-to-end setup guide (Slack app → n8n → live)
     └── docs/
         ├── n8n-ranking-guide.md     # Code-boost vs. Cohere; full implementation
         └── n8n-code-snippets.md     # Boost, RRF, debug — ready to paste

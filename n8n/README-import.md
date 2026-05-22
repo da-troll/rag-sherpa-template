@@ -12,6 +12,20 @@ This guide walks you through getting from a fresh import to a working workflow i
 
 ---
 
+## 0. Create the Slack app (one-paste setup)
+
+`n8n/slack-app-manifest.json` is a pasteable Slack app manifest. Use it to create the app in one shot instead of clicking through every scope and event setting.
+
+1. Go to **https://api.slack.com/apps → Create New App → From a manifest**.
+2. Pick your workspace.
+3. Paste the contents of `n8n/slack-app-manifest.json`.
+4. Before submitting, edit two fields in the pasted JSON:
+   - `display_information.name` and `features.bot_user.display_name` → your bot's name (match `BOT_NAME` in `.env`).
+   - `settings.event_subscriptions.request_url` → the n8n webhook URL you'll get after completing step 7 below. (You can submit with the placeholder and update later — Slack lets you edit event URLs after creation.)
+5. Click **Create**, then **Install to Workspace**. Save the Bot User OAuth Token (`xoxb-…`) — you'll need it in step 2.
+
+The manifest's scopes are pared to the minimum: `channels:history` and `chat:write`. Don't widen them unless you change the workflow.
+
 ## 1. Import the workflow
 
 In n8n: **Workflows → Import from File** → select `n8n-workflow.json` from this repo.

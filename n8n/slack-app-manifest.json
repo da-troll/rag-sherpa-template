@@ -1,0 +1,35 @@
+{
+    "display_information": {
+        "name": "RAG Bot",
+        "description": "Your go-to helper bot for questions about <YOUR_DOMAIN>.",
+        "background_color": "#546c69",
+        "long_description": "RAG Bot - AI-Powered Q&A Assistant\r\n\r\nRAG Bot is an intelligent Slack bot that provides instant, accurate answers to questions about <YOUR_DOMAIN>. It helps your team quickly find information without leaving Slack.\r\n\r\nKey Features:\r\n- Instant Knowledge Access - Get immediate answers based on your team's documentation and verified Slack discussions\r\n- Smart Document Search - AI retrieval over your help center articles, internal docs, and Slack Q&A threads\r\n- Always Up-to-Date - Re-ingest from source whenever your content changes; verified answers are marked with the :verified: reaction\r\n- Secure & Internal - Only accesses the sources you've ingested - never browses external websites\r\n\r\nHow It Works:\r\nAsk RAG Bot a question in the configured Slack channel. The bot uses RAG (retrieval-augmented generation) over:\r\n- Your structured documentation (help center, wiki, markdown)\r\n- Verified Slack Q&A threads from your team\r\n- Whatever other text sources you ingest\r\n\r\nPerfect For:\r\n- New team members getting up to speed\r\n- Support teams needing fast access to canonical answers\r\n- Reducing repetitive questions and keeping experts focused\r\n\r\nPrivacy & Security:\r\nRAG Bot operates exclusively on the internal sources you've ingested. Responses are grounded in retrieved context, with citations to the source material.\r\n\r\nCustomize this manifest before submitting:\r\n- Change `name` and `display_name` to your bot's name (paired with BOT_NAME in .env)\r\n- Update `description` and `long_description` for your domain\r\n- Set `request_url` to your n8n webhook URL after importing the workflow\r\n- The two bot scopes below are the minimum — don't widen them unless your workflow actually needs more"
+    },
+    "features": {
+        "bot_user": {
+            "display_name": "RAG Bot",
+            "always_online": true
+        }
+    },
+    "oauth_config": {
+        "scopes": {
+            "bot": [
+                "channels:history",
+                "chat:write"
+            ]
+        },
+        "pkce_enabled": false
+    },
+    "settings": {
+        "event_subscriptions": {
+            "request_url": "https://YOUR_N8N_HOST/webhook/YOUR_WEBHOOK_PATH",
+            "bot_events": [
+                "message.channels"
+            ]
+        },
+        "org_deploy_enabled": false,
+        "socket_mode_enabled": false,
+        "token_rotation_enabled": false,
+        "is_mcp_enabled": false
+    }
+}
